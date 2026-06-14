@@ -1,6 +1,6 @@
 import Foundation
 
-/// Hidden CLI mode (`SubEarn --dump`) that runs the full pipeline synchronously
+/// Hidden CLI mode (`Tokenholic --dump`) that runs the full pipeline synchronously
 /// and prints a report to stdout. Used to verify numbers against ccusage
 /// without needing to inspect the GUI.
 enum DebugDump {
@@ -39,7 +39,7 @@ enum DebugDump {
         )
         let cycleStart = BillingWindow.currentCycleStart(anchorDay: 1, now: now, calendar: calendar)
 
-        print("══════════ SubEarn debug dump ══════════")
+        print("══════════ Tokenholic debug dump ══════════")
         print("Price table entries: \(table.count)")
         print("Detected Claude tier: \(PlanDetector.claudeRateLimitTier() ?? "unknown") → $\(claudePrice)/mo")
         print("Records — Claude: \(claudePriced.count)   Codex: \(codexPriced.count)")
@@ -83,7 +83,14 @@ enum DebugDump {
             print("  \(s.tool.displayName): API \(CurrencyFormat.usd(s.monthlyAPICostUSD)) − plan \(CurrencyFormat.usd(s.subscriptionUSD)) = net \(CurrencyFormat.signed(s.netUSD))")
             print("      in \(s.inputTokens) / out \(s.outputTokens) / cacheRead \(s.cacheReadTokens) / cacheWrite \(s.cacheWriteTokens) over \(s.recordCount) msgs")
         }
-        print("  Last 5h API value: \(CurrencyFormat.usd(report.last5hCostUSD))")
+        if let s = report.session {
+            print("  This session (5h): \(CurrencyFormat.tokens(s.tokens)) tokens, \(CurrencyFormat.usd(s.apiCostUSD)) value, \(s.recordCount) msgs")
+        } else {
+            print("  This session (5h): no active session")
+        }
+        if let w = report.week {
+            print("  Past 7 days: \(CurrencyFormat.tokens(w.tokens)) tokens, \(CurrencyFormat.usd(w.apiCostUSD)) value, \(w.recordCount) msgs")
+        }
         if !report.unpricedModels.isEmpty {
             print("  ⚠️ Unpriced models: \(report.unpricedModels.joined(separator: ", "))")
         }

@@ -1,4 +1,4 @@
-# SubEarn
+# Tokenholic
 
 A native macOS menubar app that shows how much you **earn from your AI coding
 subscriptions** — i.e. what your token usage would cost at API rates versus what
@@ -32,7 +32,7 @@ Anthropic's billing.
 ## Build & run
 
 ```sh
-make          # build, assemble, and ad-hoc-sign SubEarn.app
+make          # build, assemble, and ad-hoc-sign Tokenholic.app
 make run      # build and launch
 ```
 
@@ -43,7 +43,7 @@ and Settings (plan prices, billing day, launch-at-login).
 ### Debug / verify
 
 ```sh
-.build/release/SubEarn --dump   # prints the full pipeline + a per-model
+.build/release/Tokenholic --dump   # prints the full pipeline + a per-model
                                 # breakdown for cross-checking against ccusage,
                                 # plus an incremental-store idempotency check
 ```

@@ -22,6 +22,8 @@ final class AppModel: ObservableObject {
     @Published private(set) var blendedMonthlyAPICostUSD: Double = 0
     @Published private(set) var blendedSubscriptionUSD: Double = 0
     @Published private(set) var last5hCostUSD: Double = 0
+    @Published private(set) var session: UsageWindow?
+    @Published private(set) var week: UsageWindow?
     @Published private(set) var dailyAPICost: [DailyPoint] = []
     @Published private(set) var unpricedModels: [String] = []
     @Published private(set) var menubarTitle: String = "$—"
@@ -144,6 +146,8 @@ final class AppModel: ObservableObject {
         blendedSubscriptionUSD = report.blendedSubscriptionUSD
         blendedNetUSD = report.blendedNetUSD
         last5hCostUSD = report.last5hCostUSD
+        session = report.session
+        week = report.week
         dailyAPICost = report.dailyAPICost
         unpricedModels = report.unpricedModels
         menubarTitle = CurrencyFormat.signedCompact(report.blendedNetUSD)

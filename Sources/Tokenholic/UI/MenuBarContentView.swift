@@ -28,7 +28,7 @@ struct MenuBarContentView: View {
                 ForEach(model.toolSummaries) { summary in
                     ToolCardView(summary: summary)
                 }
-                secondaryStat
+                windowsSection
             }
 
             if !model.unpricedModels.isEmpty {
@@ -74,16 +74,53 @@ struct MenuBarContentView: View {
         }
     }
 
-    private var secondaryStat: some View {
-        HStack {
-            Image(systemName: "bolt.fill").foregroundStyle(.yellow)
-            Text("Last 5h:")
-                .foregroundStyle(.secondary)
-            Text(CurrencyFormat.usd(model.last5hCostUSD) + " of API value")
+    private var windowsSection: some View {
+        VStack(spacing: 8) {
+            windowRow(icon: "bolt.fill", tint: .yellow, title: "This session",
+                      subtitle: sessionSubtitle, window: model.session,
+                      emptyText: "no active session")
+            windowRow(icon: "calendar", tint: .blue, title: "Past 7 days",
+                      subtitle: nil, window: model.week, emptyText: "—")
+        }
+    }
+
+    private func windowRow(icon: String, tint: Color, title: String,
+                           subtitle: String?, window: UsageWindow?,
+                           emptyText: String) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: icon)
+                .foregroundStyle(tint)
+                .frame(width: 16)
+            VStack(alignment: .leading, spacing: 0) {
+                Text(title)
+                if let subtitle {
+                    Text(subtitle).font(.caption2).foregroundStyle(.secondary)
+                }
+            }
             Spacer()
+            if let window, window.recordCount > 0 {
+                VStack(alignment: .trailing, spacing: 0) {
+                    Text(CurrencyFormat.tokens(window.tokens) + " tokens")
+                        .monospacedDigit()
+                    Text(CurrencyFormat.usd(window.apiCostUSD) + " value")
+                        .font(.caption2).foregroundStyle(.secondary)
+                }
+            } else {
+                Text(emptyText).font(.caption2).foregroundStyle(.secondary)
+            }
         }
         .font(.caption)
     }
+
+    private var sessionSubtitle: String? {
+        guard let start = model.session?.start else { return nil }
+        let elapsed = Date().timeIntervalSince(start)
+        guard elapsed > 0 else { return nil }
+        let hours = Int(elapsed) / 3600
+        let minutes = (Int(elapsed) % 3600) / 60
+        return "started \(hours)h \(minutes)m ago"
+    }
+
 
     private var emptyState: some View {
         HStack {

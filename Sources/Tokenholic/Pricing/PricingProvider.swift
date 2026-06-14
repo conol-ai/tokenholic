@@ -12,7 +12,7 @@ enum PricingProvider {
 
     private static var cacheFile: URL {
         let base = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("SubEarn", isDirectory: true)
+            .appendingPathComponent("Tokenholic", isDirectory: true)
         try? FileManager.default.createDirectory(at: base, withIntermediateDirectories: true)
         return base.appendingPathComponent("litellm_prices.json")
     }

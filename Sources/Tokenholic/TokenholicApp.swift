@@ -7,11 +7,11 @@ enum Entry {
             DebugDump.run()
             return
         }
-        SubEarnApp.main()
+        TokenholicApp.main()
     }
 }
 
-struct SubEarnApp: App {
+struct TokenholicApp: App {
     @StateObject private var model = AppModel()
 
     var body: some Scene {

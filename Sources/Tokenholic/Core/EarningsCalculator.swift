@@ -63,6 +63,24 @@ enum EarningsCalculator {
         report.dailyAPICost = dailyTotals
             .map { DailyPoint(day: $0.key, apiCostUSD: $0.value) }
             .sorted { $0.day < $1.day }
+
+        // Active 5h session window (blended across tools).
+        if let block = SessionWindow.activeBlock(records: records, now: now, calendar: calendar) {
+            report.session = UsageWindow.from(
+                block.records,
+                start: block.start,
+                end: block.start.addingTimeInterval(SessionWindow.sessionDuration)
+            )
+        }
+
+        // Rolling 7-day window.
+        let weekStart = now.addingTimeInterval(-7 * 24 * 3600)
+        report.week = UsageWindow.from(
+            records.filter { $0.timestamp >= weekStart },
+            start: weekStart,
+            end: now
+        )
+
         return report
     }
 }

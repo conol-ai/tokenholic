@@ -2,14 +2,14 @@
 import PackageDescription
 
 let package = Package(
-    name: "SubEarn",
+    name: "Tokenholic",
     platforms: [
         .macOS(.v14)
     ],
     targets: [
         .executableTarget(
-            name: "SubEarn",
-            path: "Sources/SubEarn",
+            name: "Tokenholic",
+            path: "Sources/Tokenholic",
             swiftSettings: [
                 // Relaxed concurrency for now; tighten to .v6 once the
                 // collector/refresh actor boundaries are settled.

@@ -1,6 +1,6 @@
 import Foundation
 
-/// A subscription-based AI coding tool that SubEarn tracks.
+/// A subscription-based AI coding tool that Tokenholic tracks.
 ///
 /// v1 only feeds `.claudeCode`, but the pipeline is built to blend all of these.
 enum Tool: String, Codable, CaseIterable, Identifiable, Sendable {

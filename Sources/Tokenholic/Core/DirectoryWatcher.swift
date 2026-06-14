@@ -5,7 +5,7 @@ import CoreServices
 /// (already coalesced by `latency`) on a background dispatch queue.
 final class DirectoryWatcher {
     private var stream: FSEventStreamRef?
-    private let queue = DispatchQueue(label: "dev.tonyhuang.subearn.fsevents")
+    private let queue = DispatchQueue(label: "ai.conol.Tokenholic.fsevents")
     private let onChange: () -> Void
 
     init?(paths: [String], latency: TimeInterval = 3.0, onChange: @escaping () -> Void) {
