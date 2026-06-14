@@ -31,9 +31,13 @@ struct MenuBarContentView: View {
                 windowsSection
             }
 
-            if model.syncAvailable && model.deviceRows.count > 1 {
+            if model.syncAvailable {
                 Divider()
-                devicesSection
+                if model.isSignedIn {
+                    devicesSection
+                } else {
+                    signInSection
+                }
             }
 
             if !model.unpricedModels.isEmpty {
@@ -129,7 +133,7 @@ struct MenuBarContentView: View {
     private var devicesSection: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack {
-                Label("Across your Macs", systemImage: "icloud")
+                Label("Across your devices", systemImage: "rectangle.stack.person.crop")
                     .font(.caption).foregroundStyle(.secondary)
                 Spacer()
                 Text(CurrencyFormat.signed(model.combinedNetUSD))
@@ -150,8 +154,31 @@ struct MenuBarContentView: View {
                 }
                 .font(.caption2)
             }
-            Text("\(CurrencyFormat.tokens(model.combinedTokens)) tokens combined · synced via iCloud")
+            HStack {
+                Text("\(CurrencyFormat.tokens(model.combinedTokens)) tokens · \(model.signedInEmail ?? "signed in")")
+                    .font(.caption2).foregroundStyle(.tertiary).lineLimit(1)
+                Spacer()
+                Button("Sign out") { model.signOut() }
+                    .buttonStyle(.borderless).controlSize(.small)
+            }
+        }
+    }
+
+    private var signInSection: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Sync across your devices")
+                .font(.caption).foregroundStyle(.secondary)
+            Text("Sign in so every device's usage rolls into one combined total.")
                 .font(.caption2).foregroundStyle(.tertiary)
+            HStack {
+                Button { model.signIn(.google) } label: {
+                    Label("Google", systemImage: "globe")
+                }
+                Button { model.signIn(.github) } label: {
+                    Label("GitHub", systemImage: "chevron.left.forwardslash.chevron.right")
+                }
+            }
+            .buttonStyle(.bordered).controlSize(.small)
         }
     }
 

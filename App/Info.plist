@@ -25,5 +25,16 @@
     <true/>
     <key>NSHumanReadableCopyright</key>
     <string>Tokenholic — subscription earnings tracker</string>
+    <key>CFBundleURLTypes</key>
+    <array>
+        <dict>
+            <key>CFBundleURLName</key>
+            <string>ai.conol.Tokenholic.auth</string>
+            <key>CFBundleURLSchemes</key>
+            <array>
+                <string>ai.conol.tokenholic</string>
+            </array>
+        </dict>
+    </array>
 </dict>
 </plist>

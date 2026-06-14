@@ -6,9 +6,15 @@ let package = Package(
     platforms: [
         .macOS(.v14)
     ],
+    dependencies: [
+        .package(url: "https://github.com/supabase/supabase-swift.git", from: "2.47.0")
+    ],
     targets: [
         .executableTarget(
             name: "Tokenholic",
+            dependencies: [
+                .product(name: "Supabase", package: "supabase-swift")
+            ],
             path: "Sources/Tokenholic",
             swiftSettings: [
                 // Relaxed concurrency for now; tighten to .v6 once the

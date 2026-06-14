@@ -29,8 +29,10 @@ final class AppModel: ObservableObject {
     @Published private(set) var unpricedModels: [String] = []
     @Published private(set) var menubarTitle: String = "$—"
 
-    // Cross-device (iCloud) sync ------------------------------------------
+    // Cross-device (Supabase) sync ----------------------------------------
     @Published private(set) var syncAvailable = false
+    @Published private(set) var isSignedIn = false
+    @Published private(set) var signedInEmail: String?
     @Published private(set) var deviceRows: [DeviceRow] = []
     @Published private(set) var combinedNetUSD: Double = 0
     @Published private(set) var combinedTokens: Int = 0
@@ -44,9 +46,9 @@ final class AppModel: ObservableObject {
     // Internal state -------------------------------------------------------
     private var records: [UsageRecord] = []
     private let store = ClaudeUsageStore()
-    private let sync = ICloudSync()
+    private let sync = SupabaseSync()
     private var localSnapshot: DeviceSnapshot?
-    private var syncCancellable: AnyCancellable?
+    private var cancellables = Set<AnyCancellable>()
     private var watcher: DirectoryWatcher?
     private var timer: Timer?
     private var priceTable: [String: ModelPrice] = [:]
@@ -95,12 +97,15 @@ final class AppModel: ObservableObject {
         timer = Timer.scheduledTimer(withTimeInterval: recomputeInterval, repeats: true) { [weak self] _ in
             Task { @MainActor in self?.recompute() }
         }
-        // Cross-device iCloud sync: publish our totals, observe peers.
+        // Cross-device sync (Supabase): publish our totals, observe peers + auth.
         sync.start()
         syncAvailable = sync.available
-        syncCancellable = sync.$peers
-            .receive(on: RunLoop.main)
-            .sink { [weak self] _ in self?.combine() }
+        sync.$peers.receive(on: RunLoop.main)
+            .sink { [weak self] _ in self?.combine() }.store(in: &cancellables)
+        sync.$isSignedIn.receive(on: RunLoop.main)
+            .sink { [weak self] value in self?.isSignedIn = value }.store(in: &cancellables)
+        sync.$userEmail.receive(on: RunLoop.main)
+            .sink { [weak self] value in self?.signedInEmail = value }.store(in: &cancellables)
         NotificationCenter.default.addObserver(
             forName: NSApplication.willTerminateNotification, object: nil, queue: .main
         ) { [weak self] _ in
@@ -110,6 +115,9 @@ final class AppModel: ObservableObject {
             }
         }
     }
+
+    func signIn(_ provider: SupabaseSync.AuthProvider) { sync.signIn(provider) }
+    func signOut() { sync.signOut() }
 
     func refreshNow() {
         Task { await refresh() }
