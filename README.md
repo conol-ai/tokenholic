@@ -68,7 +68,30 @@ Collectors  →  Normalizer  →  PricingEngine  →  EarningsCalculator  →  A
 - **AppModel**: orchestrates; FSEvents triggers incremental rescans, a 60s timer
   refreshes time-based windows.
 
+## Cross-device sync
+
+Sign in (Google or GitHub) and Tokenholic shows a **combined total across all your
+devices**. Each device upserts its own small per-device summary to a lightweight
+[Supabase](https://supabase.com) backend; Row-Level Security scopes every user to
+their own data, and the anon key (the only key shipped) can't read anyone else's.
+Every device reads them all and aggregates — the subscription is counted **once**.
+Setup: [SUPABASE_SETUP.md](SUPABASE_SETUP.md).
+
+## Releasing
+
+DMGs are built by a GitHub Action (`.github/workflows/build-dmg.yml`) — universal
+(Intel + Apple Silicon), Developer-ID-signed + notarized when the signing secrets
+are present, ad-hoc otherwise. See [RELEASING.md](RELEASING.md).
+
 ## Roadmap
 
-- M5 — Cursor (experimental; dashboard API + session cookie)
-- M6 — Developer ID signing + notarized DMG, auto-update
+- Cursor support (experimental; dashboard API + session cookie)
+- Supabase Realtime for live cross-device updates
+- Native Sign in with Apple (requires Developer ID)
+
+## License
+
+Tokenholic is free software, licensed under the **GNU General Public License v3.0**
+— see [LICENSE](LICENSE).
+
+Copyright (C) 2026 Tony Huang
