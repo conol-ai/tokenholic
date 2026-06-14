@@ -1,5 +1,6 @@
 import Foundation
 import Combine
+import AppKit
 
 /// Owns the data pipeline and exposes everything the UI binds to.
 ///
@@ -28,14 +29,24 @@ final class AppModel: ObservableObject {
     @Published private(set) var unpricedModels: [String] = []
     @Published private(set) var menubarTitle: String = "$—"
 
+    // Cross-device (iCloud) sync ------------------------------------------
+    @Published private(set) var syncAvailable = false
+    @Published private(set) var deviceRows: [DeviceRow] = []
+    @Published private(set) var combinedNetUSD: Double = 0
+    @Published private(set) var combinedTokens: Int = 0
+
     // Persisted settings (UI-editable) ------------------------------------
     @Published var claudeMonthlyPriceUSD: Double { didSet { persist(); recompute() } }
     @Published var codexMonthlyPriceUSD: Double { didSet { persist(); recompute() } }
     @Published var billingAnchorDay: Int { didSet { persist(); recompute() } }
+    @Published var menubarUsesCombined: Bool { didSet { persist(); applyMenubarTitle() } }
 
     // Internal state -------------------------------------------------------
     private var records: [UsageRecord] = []
     private let store = ClaudeUsageStore()
+    private let sync = ICloudSync()
+    private var localSnapshot: DeviceSnapshot?
+    private var syncCancellable: AnyCancellable?
     private var watcher: DirectoryWatcher?
     private var timer: Timer?
     private var priceTable: [String: ModelPrice] = [:]
@@ -47,6 +58,7 @@ final class AppModel: ObservableObject {
         static let claudePrice = "claudeMonthlyPriceUSD"
         static let codexPrice = "codexMonthlyPriceUSD"
         static let billingDay = "billingAnchorDay"
+        static let menubarCombined = "menubarUsesCombined"
     }
 
     init() {
@@ -64,6 +76,7 @@ final class AppModel: ObservableObject {
         self.claudeMonthlyPriceUSD = defaults.double(forKey: Keys.claudePrice)
         self.codexMonthlyPriceUSD = defaults.double(forKey: Keys.codexPrice)
         self.billingAnchorDay = max(1, defaults.integer(forKey: Keys.billingDay))
+        self.menubarUsesCombined = defaults.bool(forKey: Keys.menubarCombined)
         start()
     }
 
@@ -81,6 +94,20 @@ final class AppModel: ObservableObject {
         // Keep time-based windows current even with no file activity.
         timer = Timer.scheduledTimer(withTimeInterval: recomputeInterval, repeats: true) { [weak self] _ in
             Task { @MainActor in self?.recompute() }
+        }
+        // Cross-device iCloud sync: publish our totals, observe peers.
+        sync.start()
+        syncAvailable = sync.available
+        syncCancellable = sync.$peers
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in self?.combine() }
+        NotificationCenter.default.addObserver(
+            forName: NSApplication.willTerminateNotification, object: nil, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                self.sync.flush(self.localSnapshot)
+            }
         }
     }
 
@@ -150,7 +177,65 @@ final class AppModel: ObservableObject {
         week = report.week
         dailyAPICost = report.dailyAPICost
         unpricedModels = report.unpricedModels
-        menubarTitle = CurrencyFormat.signedCompact(report.blendedNetUSD)
+        publishSnapshotAndCombine()
+    }
+
+    // MARK: - Cross-device aggregation
+
+    private func publishSnapshotAndCombine() {
+        let snapshot = DeviceSnapshot(
+            deviceId: DeviceIdentity.id,
+            deviceName: DeviceIdentity.name,
+            platform: DeviceIdentity.platform,
+            appVersion: DeviceIdentity.appVersion,
+            lastUpdated: Date(),
+            windowStart: BillingWindow.currentCycleStart(
+                anchorDay: billingAnchorDay, now: Date(), calendar: .current),
+            tools: toolSummaries.map {
+                DeviceToolTotal(
+                    tool: $0.tool.rawValue,
+                    apiCostUSD: $0.monthlyAPICostUSD,
+                    inputTokens: $0.inputTokens,
+                    outputTokens: $0.outputTokens,
+                    cacheReadTokens: $0.cacheReadTokens,
+                    cacheWriteTokens: $0.cacheWriteTokens,
+                    recordCount: $0.recordCount
+                )
+            }
+        )
+        localSnapshot = snapshot
+        sync.publish(snapshot)
+        combine()
+    }
+
+    /// Merge this device's in-memory totals with synced peers. Subscription is
+    /// subtracted ONCE (you pay one plan), not per device.
+    private func combine() {
+        let peers = sync.peers
+        var rows: [DeviceRow] = []
+        if let localSnapshot { rows.append(DeviceRow(snapshot: localSnapshot, isSelf: true)) }
+        rows.append(contentsOf: peers.map { DeviceRow(snapshot: $0, isSelf: false) })
+        deviceRows = rows.sorted { $0.apiCostUSD > $1.apiCostUSD }
+
+        var apiByTool: [Tool: Double] = [:]
+        var tokens = 0
+        let snapshots = (localSnapshot.map { [$0] } ?? []) + peers
+        for snapshot in snapshots {
+            for total in snapshot.tools {
+                if let tool = Tool(rawValue: total.tool) {
+                    apiByTool[tool, default: 0] += total.apiCostUSD
+                }
+                tokens += total.totalTokens
+            }
+        }
+        combinedNetUSD = apiByTool.reduce(0) { $0 + $1.value - subscriptionPrice(for: $1.key) }
+        combinedTokens = tokens
+        applyMenubarTitle()
+    }
+
+    private func applyMenubarTitle() {
+        let useCombined = menubarUsesCombined && deviceRows.count > 1
+        menubarTitle = CurrencyFormat.signedCompact(useCombined ? combinedNetUSD : blendedNetUSD)
     }
 
     private func persist() {
@@ -158,5 +243,6 @@ final class AppModel: ObservableObject {
         defaults.set(claudeMonthlyPriceUSD, forKey: Keys.claudePrice)
         defaults.set(codexMonthlyPriceUSD, forKey: Keys.codexPrice)
         defaults.set(billingAnchorDay, forKey: Keys.billingDay)
+        defaults.set(menubarUsesCombined, forKey: Keys.menubarCombined)
     }
 }

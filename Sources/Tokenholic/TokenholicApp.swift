@@ -7,6 +7,10 @@ enum Entry {
             DebugDump.run()
             return
         }
+        if CommandLine.arguments.contains("--sync-dump") {
+            SyncDump.run()
+            return
+        }
         TokenholicApp.main()
     }
 }

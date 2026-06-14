@@ -31,6 +31,11 @@ struct MenuBarContentView: View {
                 windowsSection
             }
 
+            if model.syncAvailable && model.deviceRows.count > 1 {
+                Divider()
+                devicesSection
+            }
+
             if !model.unpricedModels.isEmpty {
                 Label("Unpriced: \(model.unpricedModels.joined(separator: ", "))",
                       systemImage: "exclamationmark.triangle.fill")
@@ -121,6 +126,34 @@ struct MenuBarContentView: View {
         return "started \(hours)h \(minutes)m ago"
     }
 
+    private var devicesSection: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Label("Across your Macs", systemImage: "icloud")
+                    .font(.caption).foregroundStyle(.secondary)
+                Spacer()
+                Text(CurrencyFormat.signed(model.combinedNetUSD))
+                    .font(.subheadline.bold().monospacedDigit())
+                    .foregroundStyle(model.combinedNetUSD >= 0 ? Color.green : Color.red)
+            }
+            ForEach(model.deviceRows) { row in
+                HStack(spacing: 6) {
+                    Image(systemName: row.isSelf ? "checkmark.circle.fill" : "desktopcomputer")
+                        .foregroundStyle(row.isSelf ? Color.green : Color.secondary)
+                    Text(row.name).lineLimit(1)
+                    if row.isStale {
+                        Text("· stale").foregroundStyle(.orange)
+                    }
+                    Spacer()
+                    Text(CurrencyFormat.usd(row.apiCostUSD))
+                        .monospacedDigit().foregroundStyle(.secondary)
+                }
+                .font(.caption2)
+            }
+            Text("\(CurrencyFormat.tokens(model.combinedTokens)) tokens combined · synced via iCloud")
+                .font(.caption2).foregroundStyle(.tertiary)
+        }
+    }
 
     private var emptyState: some View {
         HStack {
@@ -174,6 +207,9 @@ struct MenuBarContentView: View {
                             LoginItem.openSystemSettings()
                         }
                     }
+                if model.syncAvailable {
+                    Toggle("Menubar shows all-Macs total", isOn: $model.menubarUsesCombined)
+                }
             }
             .font(.caption)
             .padding(.top, 6)
