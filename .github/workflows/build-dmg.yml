@@ -1,0 +1,143 @@
+name: Build DMG
+
+# Builds a universal Tokenholic.app, packages a DMG, and (when signing secrets
+# are present) Developer-ID-signs + notarizes + staples it.
+#
+# Works with NO secrets: produces an ad-hoc-signed DMG artifact (runs locally,
+# but other Macs get a Gatekeeper warning). Add the secrets below to get a
+# notarized, distributable DMG — nothing else changes.
+#
+# Optional secrets (Settings → Secrets and variables → Actions):
+#   MACOS_CERTIFICATE       base64 of your "Developer ID Application" .p12
+#                           (base64 -i cert.p12 | pbcopy)
+#   MACOS_CERTIFICATE_PWD   the .p12 export password
+#   MACOS_SIGN_IDENTITY     e.g. "Developer ID Application: Your Name (TEAMID)"
+#   KEYCHAIN_PASSWORD       any throwaway string for the temp CI keychain
+#   # notarization (Apple ID + app-specific password):
+#   AC_APPLE_ID             your Apple ID email
+#   AC_PASSWORD             an app-specific password (appleid.apple.com)
+#   MACOS_TEAM_ID           your 10-char Team ID
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write   # to attach the DMG to a GitHub Release on tags
+
+jobs:
+  build-dmg:
+    runs-on: macos-15
+    env:
+      APP_NAME: Tokenholic
+      BUNDLE_ID: ai.conol.Tokenholic
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Toolchain
+        run: swift --version && xcodebuild -version
+
+      - name: Compute version
+        run: |
+          set -euo pipefail
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            V="${GITHUB_REF_NAME#v}"
+          else
+            BASE="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' App/Info.plist)"
+            V="${BASE}+$(echo "$GITHUB_SHA" | cut -c1-7)"
+          fi
+          echo "VERSION=$V" >> "$GITHUB_ENV"
+          echo "Building version $V"
+
+      - name: Build (universal arm64 + x86_64)
+        run: swift build -c release --arch arm64 --arch x86_64
+
+      - name: Assemble .app bundle
+        run: |
+          set -euo pipefail
+          BIN=".build/apple/Products/Release/$APP_NAME"
+          [ -f "$BIN" ] || BIN=".build/release/$APP_NAME"
+          file "$BIN"
+          APP="$APP_NAME.app"
+          rm -rf "$APP"
+          mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
+          cp "$BIN" "$APP/Contents/MacOS/$APP_NAME"
+          cp App/Info.plist "$APP/Contents/Info.plist"
+          if [ -d App/AppIcon.iconset ]; then
+            iconutil -c icns App/AppIcon.iconset -o "$APP/Contents/Resources/AppIcon.icns"
+          fi
+          printf 'APPL????' > "$APP/Contents/PkgInfo"
+
+      - name: Sign app (Developer ID if configured, else ad-hoc)
+        env:
+          MACOS_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE }}
+          MACOS_CERTIFICATE_PWD: ${{ secrets.MACOS_CERTIFICATE_PWD }}
+          MACOS_SIGN_IDENTITY: ${{ secrets.MACOS_SIGN_IDENTITY }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+        run: |
+          set -euo pipefail
+          APP="$APP_NAME.app"
+          if [ -z "${MACOS_CERTIFICATE:-}" ]; then
+            echo "::notice::No Developer ID certificate — ad-hoc signing. DMG will trip Gatekeeper on other Macs."
+            codesign --force --deep --sign - --identifier "$BUNDLE_ID" "$APP"
+            exit 0
+          fi
+          KP="${KEYCHAIN_PASSWORD:-ci-$RANDOM}"
+          KEYCHAIN="$RUNNER_TEMP/build.keychain-db"
+          echo "$MACOS_CERTIFICATE" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          security create-keychain -p "$KP" "$KEYCHAIN"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN"
+          security unlock-keychain -p "$KP" "$KEYCHAIN"
+          security import "$RUNNER_TEMP/cert.p12" -k "$KEYCHAIN" -P "${MACOS_CERTIFICATE_PWD:-}" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KP" "$KEYCHAIN" >/dev/null
+          security list-keychains -d user -s "$KEYCHAIN" $(security list-keychains -d user | tr -d '"')
+          rm -f "$RUNNER_TEMP/cert.p12"
+          codesign --force --options runtime --timestamp \
+            --sign "$MACOS_SIGN_IDENTITY" --identifier "$BUNDLE_ID" "$APP"
+          codesign --verify --strict --verbose=2 "$APP"
+
+      - name: Create DMG
+        run: |
+          set -euo pipefail
+          STAGING="$RUNNER_TEMP/dmg"
+          rm -rf "$STAGING"; mkdir -p "$STAGING"
+          cp -R "$APP_NAME.app" "$STAGING/"
+          ln -s /Applications "$STAGING/Applications"
+          DMG="$APP_NAME-$VERSION.dmg"
+          hdiutil create -volname "$APP_NAME" -srcfolder "$STAGING" -ov -format UDZO "$DMG"
+          echo "DMG=$DMG" >> "$GITHUB_ENV"
+          echo "Created $DMG"
+
+      - name: Notarize & staple (if configured)
+        env:
+          AC_APPLE_ID: ${{ secrets.AC_APPLE_ID }}
+          AC_PASSWORD: ${{ secrets.AC_PASSWORD }}
+          AC_TEAM_ID: ${{ secrets.MACOS_TEAM_ID }}
+          MACOS_SIGN_IDENTITY: ${{ secrets.MACOS_SIGN_IDENTITY }}
+        run: |
+          set -euo pipefail
+          if [ -z "${AC_APPLE_ID:-}" ] || [ -z "${MACOS_SIGN_IDENTITY:-}" ]; then
+            echo "::warning::Notarization secrets not set — DMG built but NOT notarized; users will see a Gatekeeper warning."
+            exit 0
+          fi
+          codesign --force --sign "$MACOS_SIGN_IDENTITY" --timestamp "$DMG"
+          xcrun notarytool submit "$DMG" \
+            --apple-id "$AC_APPLE_ID" --password "$AC_PASSWORD" --team-id "$AC_TEAM_ID" --wait
+          xcrun stapler staple "$DMG"
+          xcrun stapler validate "$DMG"
+
+      - name: Upload DMG artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.APP_NAME }}-${{ env.VERSION }}
+          path: ${{ env.DMG }}
+          if-no-files-found: error
+
+      - name: Attach DMG to Release (tags only)
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ env.DMG }}
+          generate_release_notes: true
