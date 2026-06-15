@@ -3,3 +3,8 @@
 .DS_Store
 *.xcodeproj
 .swiftpm/
+
+# Signing material / credentials — NEVER commit
+infra/
+*.p12
+*.p8

@@ -11,12 +11,12 @@ name: Build DMG
 #   MACOS_CERTIFICATE       base64 of your "Developer ID Application" .p12
 #                           (base64 -i cert.p12 | pbcopy)
 #   MACOS_CERTIFICATE_PWD   the .p12 export password
-#   MACOS_SIGN_IDENTITY     e.g. "Developer ID Application: Your Name (TEAMID)"
 #   KEYCHAIN_PASSWORD       any throwaway string for the temp CI keychain
-#   # notarization (Apple ID + app-specific password):
-#   AC_APPLE_ID             your Apple ID email
-#   AC_PASSWORD             an app-specific password (appleid.apple.com)
-#   MACOS_TEAM_ID           your 10-char Team ID
+#   # notarization (App Store Connect API key):
+#   AC_API_KEY              contents of the AuthKey_XXXXXXXXXX.p8 file
+#   AC_API_KEY_ID           the key id (the XXXXXXXXXX in the filename)
+#   AC_API_ISSUER_ID        the App Store Connect issuer id (a UUID)
+# The Developer ID signing identity is auto-detected from the imported cert.
 
 on:
   workflow_dispatch:
@@ -74,7 +74,6 @@ jobs:
         env:
           MACOS_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE }}
           MACOS_CERTIFICATE_PWD: ${{ secrets.MACOS_CERTIFICATE_PWD }}
-          MACOS_SIGN_IDENTITY: ${{ secrets.MACOS_SIGN_IDENTITY }}
           KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
         run: |
           set -euo pipefail
@@ -94,8 +93,16 @@ jobs:
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KP" "$KEYCHAIN" >/dev/null
           security list-keychains -d user -s "$KEYCHAIN" $(security list-keychains -d user | tr -d '"')
           rm -f "$RUNNER_TEMP/cert.p12"
+          # Auto-detect the Developer ID Application identity from the imported cert.
+          IDENTITY=$(security find-identity -v -p codesigning "$KEYCHAIN" \
+            | awk -F'"' '/Developer ID Application/{print $2; exit}')
+          if [ -z "$IDENTITY" ]; then
+            echo "::error::No 'Developer ID Application' identity found in the certificate."; exit 1
+          fi
+          echo "Signing with: $IDENTITY"
+          echo "SIGN_IDENTITY=$IDENTITY" >> "$GITHUB_ENV"
           codesign --force --options runtime --timestamp \
-            --sign "$MACOS_SIGN_IDENTITY" --identifier "$BUNDLE_ID" "$APP"
+            --sign "$IDENTITY" --identifier "$BUNDLE_ID" "$APP"
           codesign --verify --strict --verbose=2 "$APP"
 
       - name: Create DMG
@@ -112,19 +119,22 @@ jobs:
 
       - name: Notarize & staple (if configured)
         env:
-          AC_APPLE_ID: ${{ secrets.AC_APPLE_ID }}
-          AC_PASSWORD: ${{ secrets.AC_PASSWORD }}
-          AC_TEAM_ID: ${{ secrets.MACOS_TEAM_ID }}
-          MACOS_SIGN_IDENTITY: ${{ secrets.MACOS_SIGN_IDENTITY }}
+          AC_API_KEY: ${{ secrets.AC_API_KEY }}
+          AC_API_KEY_ID: ${{ secrets.AC_API_KEY_ID }}
+          AC_API_ISSUER_ID: ${{ secrets.AC_API_ISSUER_ID }}
         run: |
           set -euo pipefail
-          if [ -z "${AC_APPLE_ID:-}" ] || [ -z "${MACOS_SIGN_IDENTITY:-}" ]; then
-            echo "::warning::Notarization secrets not set — DMG built but NOT notarized; users will see a Gatekeeper warning."
+          if [ -z "${AC_API_KEY:-}" ] || [ -z "${SIGN_IDENTITY:-}" ]; then
+            echo "::warning::Notarization key / signing identity not set — DMG built but NOT notarized; users will see a Gatekeeper warning."
             exit 0
           fi
-          codesign --force --sign "$MACOS_SIGN_IDENTITY" --timestamp "$DMG"
+          # Sign the DMG with the same Developer ID identity used for the app.
+          codesign --force --sign "$SIGN_IDENTITY" --timestamp "$DMG"
+          KEY="$RUNNER_TEMP/AuthKey.p8"
+          printf '%s' "$AC_API_KEY" > "$KEY"
           xcrun notarytool submit "$DMG" \
-            --apple-id "$AC_APPLE_ID" --password "$AC_PASSWORD" --team-id "$AC_TEAM_ID" --wait
+            --key "$KEY" --key-id "$AC_API_KEY_ID" --issuer "$AC_API_ISSUER_ID" --wait
+          rm -f "$KEY"
           xcrun stapler staple "$DMG"
           xcrun stapler validate "$DMG"
 

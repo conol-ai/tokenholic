@@ -27,11 +27,13 @@ Add under Settings → Secrets and variables → Actions:
 |---|---|
 | `MACOS_CERTIFICATE` | base64 of your "Developer ID Application" `.p12` (`base64 -i cert.p12 \| pbcopy`) |
 | `MACOS_CERTIFICATE_PWD` | the `.p12` export password |
-| `MACOS_SIGN_IDENTITY` | e.g. `Developer ID Application: Your Name (TEAMID)` |
 | `KEYCHAIN_PASSWORD` | any throwaway string for the CI keychain |
-| `AC_APPLE_ID` | your Apple ID email |
-| `AC_PASSWORD` | an app-specific password (appleid.apple.com → Sign-In & Security) |
-| `MACOS_TEAM_ID` | your 10-character Team ID |
+| `AC_API_KEY` | contents of your App Store Connect `AuthKey_XXXXXXXXXX.p8` |
+| `AC_API_KEY_ID` | the key id (the `XXXXXXXXXX` in the `.p8` filename) |
+| `AC_API_ISSUER_ID` | the App Store Connect issuer id (a UUID) |
+
+The Developer ID signing identity is **auto-detected** from the imported
+certificate — no `MACOS_SIGN_IDENTITY` secret needed.
 
 **Without these secrets the workflow still runs** — it produces an *ad-hoc*-signed
 DMG artifact that runs locally but shows a Gatekeeper warning on other Macs.
@@ -41,5 +43,4 @@ DMG artifact that runs locally but shows a Gatekeeper warning on other Macs.
 ```sh
 make                      # ad-hoc-signed Tokenholic.app
 .build/release/Tokenholic --dump        # earnings pipeline + ccusage cross-check
-.build/release/Tokenholic --sync-dump   # iCloud peers + combined total
 ```
