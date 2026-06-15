@@ -22,5 +22,12 @@ struct TokenholicApp: App {
             Text(model.menubarTitle)
         }
         .menuBarExtraStyle(.window)
+
+        Window("Tokenholic Settings", id: "settings") {
+            SettingsView()
+                .environmentObject(model)
+        }
+        .windowResizability(.contentSize)
+        .defaultPosition(.center)
     }
 }

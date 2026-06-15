@@ -4,8 +4,7 @@ import AppKit
 /// The popover shown when the menubar item is clicked.
 struct MenuBarContentView: View {
     @EnvironmentObject private var model: AppModel
-    @State private var showSettings = false
-    @State private var launchAtLogin = LoginItem.isEnabled
+    @Environment(\.openWindow) private var openWindow
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -47,8 +46,6 @@ struct MenuBarContentView: View {
                     .foregroundStyle(.orange)
             }
 
-            Divider()
-            settingsSection
             Divider()
             footer
         }
@@ -196,55 +193,6 @@ struct MenuBarContentView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private var settingsSection: some View {
-        DisclosureGroup(isExpanded: $showSettings) {
-            VStack(alignment: .leading, spacing: 8) {
-                HStack {
-                    Text("Claude plan, $/mo")
-                    Spacer()
-                    TextField("price", value: $model.claudeMonthlyPriceUSD, format: .number)
-                        .textFieldStyle(.roundedBorder)
-                        .multilineTextAlignment(.trailing)
-                        .frame(width: 72)
-                }
-                HStack {
-                    Text("ChatGPT/Codex plan, $/mo")
-                    Spacer()
-                    TextField("price", value: $model.codexMonthlyPriceUSD, format: .number)
-                        .textFieldStyle(.roundedBorder)
-                        .multilineTextAlignment(.trailing)
-                        .frame(width: 72)
-                }
-                HStack {
-                    Text("Billing day of month")
-                    Spacer()
-                    Stepper(value: $model.billingAnchorDay, in: 1...28) {
-                        Text("\(model.billingAnchorDay)").monospacedDigit()
-                    }
-                    .labelsHidden()
-                }
-                Toggle("Launch at login", isOn: $launchAtLogin)
-                    .onChange(of: launchAtLogin) { _, newValue in
-                        do {
-                            try LoginItem.setEnabled(newValue)
-                        } catch {
-                            launchAtLogin = LoginItem.isEnabled // revert on failure
-                        }
-                        if newValue, LoginItem.requiresApproval {
-                            LoginItem.openSystemSettings()
-                        }
-                    }
-                if model.syncAvailable {
-                    Toggle("Menubar shows all-Macs total", isOn: $model.menubarUsesCombined)
-                }
-            }
-            .font(.caption)
-            .padding(.top, 6)
-        } label: {
-            Label("Settings", systemImage: "gearshape.fill").font(.caption)
-        }
-    }
-
     private var footer: some View {
         HStack {
             if let updated = model.lastUpdated {
@@ -260,6 +208,15 @@ struct MenuBarContentView: View {
             }
             .buttonStyle(.borderless)
             .help("Refresh now")
+
+            Button {
+                NSApp.activate(ignoringOtherApps: true)
+                openWindow(id: "settings")
+            } label: {
+                Image(systemName: "gearshape")
+            }
+            .buttonStyle(.borderless)
+            .help("Settings")
 
             Button("Quit") {
                 NSApplication.shared.terminate(nil)
