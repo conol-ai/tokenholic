@@ -51,8 +51,11 @@ jobs:
           echo "VERSION=$V" >> "$GITHUB_ENV"
           echo "Building version $V"
 
-      - name: Build (universal arm64 + x86_64)
-        run: swift build -c release --arch arm64 --arch x86_64
+      - name: Build (release, arm64)
+        # Native build on the arm64 runner. A universal `--arch arm64 --arch
+        # x86_64` build hits a swiftLanguageMode→SWIFT_VERSION bug in the
+        # runner's Swift 6.1 xcbuild path; revisit for Intel/universal support.
+        run: swift build -c release
 
       - name: Assemble .app bundle
         run: |
