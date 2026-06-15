@@ -121,6 +121,9 @@ jobs:
           echo "Created $DMG"
 
       - name: Notarize & staple (if configured)
+        # Non-fatal: if Apple's notary is slow/down, still ship the signed
+        # (un-stapled) DMG rather than hanging or failing the whole build.
+        continue-on-error: true
         env:
           AC_API_KEY: ${{ secrets.AC_API_KEY }}
           AC_API_KEY_ID: ${{ secrets.AC_API_KEY_ID }}
@@ -136,7 +139,8 @@ jobs:
           KEY="$RUNNER_TEMP/AuthKey.p8"
           printf '%s' "$AC_API_KEY" > "$KEY"
           xcrun notarytool submit "$DMG" \
-            --key "$KEY" --key-id "$AC_API_KEY_ID" --issuer "$AC_API_ISSUER_ID" --wait
+            --key "$KEY" --key-id "$AC_API_KEY_ID" --issuer "$AC_API_ISSUER_ID" \
+            --wait --timeout 30m
           rm -f "$KEY"
           xcrun stapler staple "$DMG"
           xcrun stapler validate "$DMG"
