@@ -8,6 +8,9 @@ struct MenuBarContentView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
+            if let version = model.updateVersion {
+                updateBanner(version)
+            }
             header
 
             if model.dailyAPICost.count >= 2 {
@@ -54,6 +57,22 @@ struct MenuBarContentView: View {
     }
 
     // MARK: - Sections
+
+    private func updateBanner(_ version: String) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: "arrow.down.circle.fill").foregroundStyle(.blue)
+            Text("Update available: \(version)").font(.caption.bold())
+            Spacer()
+            if model.isDownloadingUpdate {
+                ProgressView().controlSize(.small)
+            } else {
+                Button("Get") { model.downloadUpdate() }
+                    .buttonStyle(.borderedProminent).controlSize(.small)
+            }
+        }
+        .padding(8)
+        .background(RoundedRectangle(cornerRadius: 8).fill(Color.blue.opacity(0.12)))
+    }
 
     private var header: some View {
         HStack(alignment: .firstTextBaseline) {

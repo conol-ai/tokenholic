@@ -5,6 +5,10 @@ struct SettingsView: View {
     @EnvironmentObject private var model: AppModel
     @State private var launchAtLogin = LoginItem.isEnabled
 
+    private var appVersion: String {
+        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "—"
+    }
+
     var body: some View {
         Form {
             Section("Subscriptions") {
@@ -41,6 +45,17 @@ struct SettingsView: View {
                 if model.syncAvailable {
                     Toggle("Menu bar shows all-devices total", isOn: $model.menubarUsesCombined)
                 }
+            }
+
+            Section("Updates") {
+                LabeledContent("Version", value: appVersion)
+                if let v = model.updateVersion {
+                    LabeledContent("Latest", value: "\(v) available")
+                }
+                Button(model.isDownloadingUpdate ? "Downloading…" : "Check for Updates…") {
+                    model.updateVersion == nil ? model.checkForUpdates() : model.downloadUpdate()
+                }
+                .disabled(model.isDownloadingUpdate)
             }
         }
         .formStyle(.grouped)

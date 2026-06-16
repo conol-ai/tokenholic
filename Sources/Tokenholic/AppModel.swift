@@ -37,6 +37,10 @@ final class AppModel: ObservableObject {
     @Published private(set) var combinedNetUSD: Double = 0
     @Published private(set) var combinedTokens: Int = 0
 
+    // Auto-update -----------------------------------------------------------
+    @Published private(set) var updateVersion: String?
+    @Published private(set) var isDownloadingUpdate = false
+
     // Persisted settings (UI-editable) ------------------------------------
     @Published var claudeMonthlyPriceUSD: Double { didSet { persist(); recompute() } }
     @Published var codexMonthlyPriceUSD: Double { didSet { persist(); recompute() } }
@@ -47,6 +51,7 @@ final class AppModel: ObservableObject {
     private var records: [UsageRecord] = []
     private let store = ClaudeUsageStore()
     private let sync = SupabaseSync()
+    private let updater = UpdateChecker()
     private var localSnapshot: DeviceSnapshot?
     private var cancellables = Set<AnyCancellable>()
     private var watcher: DirectoryWatcher?
@@ -106,6 +111,12 @@ final class AppModel: ObservableObject {
             .sink { [weak self] value in self?.isSignedIn = value }.store(in: &cancellables)
         sync.$userEmail.receive(on: RunLoop.main)
             .sink { [weak self] value in self?.signedInEmail = value }.store(in: &cancellables)
+        // Auto-update: poll GitHub Releases.
+        updater.start()
+        updater.$available.receive(on: RunLoop.main)
+            .sink { [weak self] in self?.updateVersion = $0?.version }.store(in: &cancellables)
+        updater.$isDownloading.receive(on: RunLoop.main)
+            .sink { [weak self] in self?.isDownloadingUpdate = $0 }.store(in: &cancellables)
         NotificationCenter.default.addObserver(
             forName: NSApplication.willTerminateNotification, object: nil, queue: .main
         ) { [weak self] _ in
@@ -118,6 +129,8 @@ final class AppModel: ObservableObject {
 
     func signIn(_ provider: SupabaseSync.AuthProvider) { sync.signIn(provider) }
     func signOut() { sync.signOut() }
+    func downloadUpdate() { updater.downloadAndOpen() }
+    func checkForUpdates() { updater.checkNow() }
 
     func refreshNow() {
         Task { await refresh() }

@@ -7,6 +7,10 @@ enum Entry {
             DebugDump.run()
             return
         }
+        if CommandLine.arguments.contains("--check-update") {
+            UpdateCheckDebug.run()
+            return
+        }
         TokenholicApp.main()
     }
 }
