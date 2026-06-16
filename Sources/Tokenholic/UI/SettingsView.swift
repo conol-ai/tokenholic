@@ -11,22 +11,19 @@ struct SettingsView: View {
 
     var body: some View {
         Form {
-            Section("Subscriptions") {
-                LabeledContent("Claude plan, $/mo") {
-                    TextField("price", value: $model.claudeMonthlyPriceUSD, format: .number)
-                        .multilineTextAlignment(.trailing)
-                        .frame(width: 90)
-                }
-                LabeledContent("ChatGPT / Codex plan, $/mo") {
-                    TextField("price", value: $model.codexMonthlyPriceUSD, format: .number)
-                        .multilineTextAlignment(.trailing)
-                        .frame(width: 90)
-                }
+            Section {
+                planField("Claude plan", value: $model.claudeMonthlyPriceUSD)
+                planField("ChatGPT / Codex plan", value: $model.codexMonthlyPriceUSD)
+            } header: {
+                Text("Subscriptions")
+            } footer: {
+                Text("Your monthly price per tool, in USD. Set 0 for a tool you don't pay for.")
+                    .font(.caption2).foregroundStyle(.secondary)
             }
 
             Section("Billing") {
                 Stepper(value: $model.billingAnchorDay, in: 1...28) {
-                    LabeledContent("Billing day of month", value: "\(model.billingAnchorDay)")
+                    LabeledContent("Billing cycle resets on day", value: "\(model.billingAnchorDay)")
                 }
             }
 
@@ -49,16 +46,37 @@ struct SettingsView: View {
 
             Section("Updates") {
                 LabeledContent("Version", value: appVersion)
-                if let v = model.updateVersion {
-                    LabeledContent("Latest", value: "\(v) available")
+                if let latest = model.updateVersion {
+                    LabeledContent("Latest", value: "\(latest) available")
                 }
-                Button(model.isDownloadingUpdate ? "Downloading…" : "Check for Updates…") {
-                    model.updateVersion == nil ? model.checkForUpdates() : model.downloadUpdate()
+                Button(updateButtonTitle) {
+                    if model.updateVersion == nil { model.checkForUpdates() }
+                    else { model.downloadUpdate() }
                 }
                 .disabled(model.isDownloadingUpdate)
             }
         }
         .formStyle(.grouped)
-        .frame(width: 380, height: 340)
+        .frame(width: 420, height: 500)
+    }
+
+    /// A "$/mo" plan row: label on the left, a right-aligned editable dollar amount.
+    private func planField(_ label: String, value: Binding<Double>) -> some View {
+        LabeledContent(label) {
+            HStack(spacing: 4) {
+                Text("$")
+                TextField("", value: value, format: .number)
+                    .labelsHidden()
+                    .multilineTextAlignment(.trailing)
+                    .frame(width: 70)
+                Text("/mo").foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private var updateButtonTitle: String {
+        if model.isDownloadingUpdate { return "Downloading…" }
+        if let v = model.updateVersion { return "Download \(v)" }
+        return "Check for Updates…"
     }
 }
