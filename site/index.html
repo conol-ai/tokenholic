@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Tokenholic — see what your AI coding subscriptions actually earn you</title>
+<meta name="description" content="A native macOS menubar app that shows your net earnings from AI coding subscriptions: what your token usage would cost at API rates, minus what you pay. Supports Claude Code and Codex. Validated against ccusage to the cent. Free and open source." />
+<meta name="theme-color" content="#080a09" />
+<link rel="icon" type="image/png" href="/icon.png" />
+<link rel="apple-touch-icon" href="/icon.png" />
+
+<!-- Open Graph -->
+<meta property="og:type" content="website" />
+<meta property="og:title" content="Tokenholic — what your AI coding subscriptions actually earn you" />
+<meta property="og:description" content="A macOS menubar app that turns your token usage into a live earnings number: API-rate cost of your tokens, minus your subscription price. Claude Code + Codex. Open source." />
+<meta property="og:url" content="https://tokenholic.app" />
+<meta property="og:image" content="https://tokenholic.app/icon.png" />
+<meta name="twitter:card" content="summary" />
+<meta name="twitter:image" content="https://tokenholic.app/icon.png" />
+
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+
+<style>
+  :root {
+    /* OKLCH terminal-native dark. Body bg is near-black at chroma 0 (avoids warm-cream AI default). */
+    --bg:        oklch(0.16 0.008 165);
+    --bg-deep:   oklch(0.13 0.008 165);
+    --surface:   oklch(0.20 0.010 165);
+    --surface-2: oklch(0.24 0.012 165);
+    --line:      oklch(0.30 0.012 165);
+    --line-soft: oklch(0.26 0.010 165);
+
+    --ink:       oklch(0.96 0.004 165);   /* near-white body */
+    --ink-dim:   oklch(0.78 0.006 165);   /* secondary text, >4.5:1 on bg */
+    --ink-faint: oklch(0.62 0.008 165);   /* labels / captions, large only */
+
+    /* Phosphor green = "in the black" / profit. Meaningful, not decorative. */
+    --green:     oklch(0.86 0.20 158);
+    --green-mid: oklch(0.74 0.19 158);
+    --green-dim: oklch(0.55 0.13 158);
+    --glow:      oklch(0.86 0.20 158 / 0.35);
+
+    --amber:     oklch(0.82 0.15 78);     /* the subscription cost (what you pay) */
+    --red:       oklch(0.72 0.18 25);
+
+    --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+    --sans: "Inter", system-ui, -apple-system, sans-serif;
+
+    --maxw: 1080px;
+    --ease: cubic-bezier(0.16, 1, 0.3, 1);
+
+    --z-grid: 0;
+    --z-base: 1;
+    --z-nav: 50;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 17px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    overflow-x: hidden;
+  }
+
+  /* faint terminal scanline / grid backdrop */
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: var(--z-grid);
+    pointer-events: none;
+    background:
+      radial-gradient(1100px 700px at 50% -8%, oklch(0.22 0.04 158 / 0.40), transparent 70%),
+      linear-gradient(var(--line-soft) 1px, transparent 1px) 0 0 / 100% 88px,
+      linear-gradient(90deg, var(--line-soft) 1px, transparent 1px) 0 0 / 88px 100%;
+    -webkit-mask-image: radial-gradient(120% 90% at 50% 0%, #000 35%, transparent 78%);
+            mask-image: radial-gradient(120% 90% at 50% 0%, #000 35%, transparent 78%);
+    opacity: 0.5;
+  }
+
+  a { color: inherit; text-decoration: none; }
+  ::selection { background: var(--glow); color: var(--ink); }
+
+  .wrap { max-width: var(--maxw); margin: 0 auto; padding: 0 24px; position: relative; z-index: var(--z-base); }
+
+  /* ---------- nav ---------- */
+  nav {
+    position: sticky; top: 0; z-index: var(--z-nav);
+    backdrop-filter: blur(14px);
+    background: oklch(0.16 0.008 165 / 0.72);
+    border-bottom: 1px solid var(--line-soft);
+  }
+  .nav-inner {
+    max-width: var(--maxw); margin: 0 auto; padding: 14px 24px;
+    display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  }
+  .brand { display: flex; align-items: center; gap: 10px; font-family: var(--mono); font-weight: 800; letter-spacing: -0.02em; font-size: 16px; }
+  .brand .mark {
+    width: 28px; height: 28px; border-radius: 7px;
+    display: block; object-fit: contain;
+    box-shadow: 0 0 16px oklch(0.6 0.18 255 / 0.35);
+  }
+  .nav-links { display: flex; align-items: center; gap: 26px; font-size: 14.5px; color: var(--ink-dim); }
+  .nav-links a { transition: color 0.2s; }
+  .nav-links a:hover { color: var(--ink); }
+  .nav-cta {
+    font-family: var(--mono); font-size: 13.5px; font-weight: 600;
+    color: var(--bg-deep); background: var(--green);
+    padding: 8px 15px; border-radius: 8px;
+    transition: transform 0.2s var(--ease), box-shadow 0.2s;
+    box-shadow: 0 0 0 var(--glow);
+  }
+  .nav-cta:hover { transform: translateY(-1px); box-shadow: 0 6px 22px var(--glow); }
+  .nav-links .hide-sm { }
+
+  /* ---------- hero ---------- */
+  header.hero { padding: 86px 0 30px; }
+  .kicker {
+    font-family: var(--mono); font-size: 13px; color: var(--green-mid);
+    display: inline-flex; align-items: center; gap: 9px; margin-bottom: 26px;
+  }
+  .kicker .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); box-shadow: 0 0 10px var(--green); animation: pulse 2.4s var(--ease) infinite; }
+  @keyframes pulse { 0%,100%{ opacity: 1; } 50%{ opacity: 0.35; } }
+
+  h1 {
+    font-family: var(--sans); font-weight: 700;
+    font-size: clamp(2.4rem, 6vw, 4.2rem);
+    line-height: 1.04; letter-spacing: -0.035em;
+    text-wrap: balance; max-width: 16ch;
+  }
+  h1 .em { color: var(--green); }
+  .sub {
+    margin-top: 24px; font-size: clamp(1.05rem, 2.2vw, 1.28rem);
+    color: var(--ink-dim); max-width: 56ch; line-height: 1.55; text-wrap: pretty;
+  }
+
+  .cta-row { margin-top: 38px; display: flex; flex-wrap: wrap; gap: 14px; align-items: center; }
+  .btn {
+    font-family: var(--mono); font-size: 15px; font-weight: 600;
+    display: inline-flex; align-items: center; gap: 11px;
+    padding: 14px 22px; border-radius: 11px;
+    transition: transform 0.2s var(--ease), box-shadow 0.25s, border-color 0.2s, background 0.2s;
+  }
+  .btn-primary {
+    color: var(--bg-deep); background: var(--green);
+    box-shadow: 0 8px 30px var(--glow);
+  }
+  .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 14px 40px var(--glow); }
+  .btn-ghost {
+    color: var(--ink); border: 1px solid var(--line);
+    background: oklch(0.20 0.01 165 / 0.5);
+  }
+  .btn-ghost:hover { border-color: var(--green-dim); transform: translateY(-2px); }
+  .btn svg { width: 18px; height: 18px; }
+  .meta-line {
+    margin-top: 18px; font-family: var(--mono); font-size: 13px; color: var(--ink-faint);
+    display: flex; flex-wrap: wrap; gap: 8px 16px;
+  }
+  .meta-line b { color: var(--ink-dim); font-weight: 500; }
+
+  /* ---------- the ledger panel (the product's actual headline number) ---------- */
+  .panel-stage { margin-top: 64px; perspective: 1400px; }
+  .ledger {
+    background: linear-gradient(180deg, var(--surface), var(--bg-deep));
+    border: 1px solid var(--line);
+    border-radius: 18px;
+    box-shadow: 0 40px 90px -30px oklch(0 0 0 / 0.7), inset 0 1px 0 oklch(1 0 0 / 0.04);
+    overflow: hidden;
+    max-width: 620px; margin: 0 auto;
+  }
+  .ledger-bar {
+    display: flex; align-items: center; gap: 8px;
+    padding: 13px 18px; border-bottom: 1px solid var(--line-soft);
+    background: oklch(0.18 0.008 165 / 0.7);
+  }
+  .ledger-bar .tl { width: 11px; height: 11px; border-radius: 50%; background: var(--line); }
+  .ledger-bar .tl:nth-child(1){ background: oklch(0.55 0.16 25); }
+  .ledger-bar .tl:nth-child(2){ background: oklch(0.78 0.13 78); }
+  .ledger-bar .tl:nth-child(3){ background: var(--green-dim); }
+  .ledger-bar .title { margin-left: 8px; font-family: var(--mono); font-size: 12.5px; color: var(--ink-faint); }
+  .ledger-body { padding: 30px 30px 32px; }
+  .ledger-label { font-family: var(--mono); font-size: 12.5px; color: var(--ink-faint); letter-spacing: 0.02em; }
+  .earnings {
+    font-family: var(--mono); font-weight: 800;
+    font-size: clamp(2.8rem, 9vw, 4.4rem); line-height: 1; letter-spacing: -0.04em;
+    color: var(--green); margin: 8px 0 4px;
+    text-shadow: 0 0 28px var(--glow);
+    font-variant-numeric: tabular-nums;
+  }
+  .earnings .pre { color: var(--green-mid); }
+  .earnings-sub { font-family: var(--mono); font-size: 13px; color: var(--ink-dim); }
+  .earnings-sub .up { color: var(--green-mid); }
+
+  .calc {
+    margin-top: 26px; padding-top: 22px; border-top: 1px dashed var(--line);
+    display: grid; gap: 11px; font-family: var(--mono); font-size: 13.5px;
+  }
+  .calc .row { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; }
+  .calc .row .k { color: var(--ink-dim); }
+  .calc .row .v { font-variant-numeric: tabular-nums; }
+  .calc .row .v.pos { color: var(--green-mid); }
+  .calc .row .v.neg { color: var(--amber); }
+  .calc .row.sum { margin-top: 4px; padding-top: 12px; border-top: 1px solid var(--line-soft); }
+  .calc .row.sum .k { color: var(--ink); }
+  .calc .row.sum .v { color: var(--green); font-weight: 700; }
+
+  .spark { margin-top: 24px; }
+  .spark svg { width: 100%; height: 54px; display: block; }
+  .spark-cap { font-family: var(--mono); font-size: 11.5px; color: var(--ink-faint); margin-top: 6px; }
+
+  /* ---------- logos / tools strip ---------- */
+  .strip { margin-top: 60px; padding: 26px 0; border-top: 1px solid var(--line-soft); border-bottom: 1px solid var(--line-soft); }
+  .strip-inner { display: flex; flex-wrap: wrap; align-items: center; gap: 14px 30px; justify-content: center; font-family: var(--mono); font-size: 13.5px; color: var(--ink-dim); }
+  .strip .chip { display: inline-flex; align-items: center; gap: 9px; }
+  .strip .chip .s { font-size: 11px; padding: 2px 7px; border-radius: 5px; font-weight: 600; }
+  .strip .s.ok { color: var(--green); background: oklch(0.5 0.13 158 / 0.18); }
+  .strip .s.soon { color: var(--ink-faint); background: oklch(0.4 0.01 165 / 0.4); }
+
+  /* ---------- sections ---------- */
+  section { padding: 92px 0; }
+  .sec-head { max-width: 60ch; }
+  .sec-head h2 {
+    font-family: var(--sans); font-weight: 700; font-size: clamp(1.8rem, 4vw, 2.7rem);
+    letter-spacing: -0.03em; line-height: 1.1; text-wrap: balance;
+  }
+  .sec-head p { margin-top: 16px; color: var(--ink-dim); font-size: 1.08rem; max-width: 54ch; }
+
+  /* how it works — a real pipeline, so numbers earn their place */
+  .pipe { margin-top: 52px; display: grid; gap: 18px; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+  .step {
+    position: relative; padding: 26px 24px; border-radius: 14px;
+    background: var(--surface); border: 1px solid var(--line-soft);
+    transition: border-color 0.25s, transform 0.25s var(--ease), background 0.25s;
+  }
+  .step:hover { border-color: var(--green-dim); transform: translateY(-3px); background: var(--surface-2); }
+  .step .n { font-family: var(--mono); font-size: 12.5px; color: var(--green-mid); }
+  .step h3 { margin: 12px 0 8px; font-size: 1.12rem; font-weight: 650; letter-spacing: -0.01em; }
+  .step p { color: var(--ink-dim); font-size: 0.96rem; line-height: 1.55; }
+  .step code { font-family: var(--mono); font-size: 0.84em; color: var(--green-mid); background: var(--bg-deep); padding: 1px 6px; border-radius: 5px; }
+
+  /* feature blocks — varied, not identical cards */
+  .features { margin-top: 52px; display: grid; gap: 18px; grid-template-columns: 1.3fr 1fr; }
+  @media (max-width: 760px) { .features { grid-template-columns: 1fr; } }
+  .feat {
+    padding: 30px; border-radius: 16px; border: 1px solid var(--line-soft);
+    background: linear-gradient(180deg, var(--surface), var(--bg-deep));
+  }
+  .feat.span-2 { grid-column: 1 / -1; display: grid; grid-template-columns: 1.1fr 1fr; gap: 30px; align-items: center; }
+  @media (max-width: 760px){ .feat.span-2 { grid-template-columns: 1fr; } }
+  .feat .fi { font-family: var(--mono); font-size: 12px; color: var(--green-mid); margin-bottom: 14px; display:flex; align-items:center; gap:8px; }
+  .feat h3 { font-size: 1.3rem; font-weight: 680; letter-spacing: -0.02em; }
+  .feat p { margin-top: 12px; color: var(--ink-dim); font-size: 1rem; line-height: 1.6; }
+  .feat p .hl { color: var(--ink); }
+
+  .code-card {
+    background: var(--bg-deep); border: 1px solid var(--line); border-radius: 12px;
+    font-family: var(--mono); font-size: 13px; overflow: hidden;
+  }
+  .code-card .cc-bar { padding: 9px 14px; border-bottom: 1px solid var(--line-soft); color: var(--ink-faint); font-size: 12px; }
+  .code-card pre { padding: 16px 16px 18px; overflow-x: auto; line-height: 1.7; color: var(--ink-dim); }
+  .code-card .cm { color: var(--ink-faint); }
+  .code-card .g { color: var(--green-mid); }
+  .code-card .a { color: var(--amber); }
+
+  /* privacy / open source row */
+  .duo { margin-top: 52px; display: grid; gap: 18px; grid-template-columns: 1fr 1fr; }
+  @media (max-width: 700px){ .duo { grid-template-columns: 1fr; } }
+  .duo .feat ul { margin-top: 14px; display: grid; gap: 10px; list-style: none; }
+  .duo .feat li { display: flex; gap: 11px; color: var(--ink-dim); font-size: 0.98rem; }
+  .duo .feat li svg { flex: 0 0 auto; width: 17px; height: 17px; margin-top: 4px; color: var(--green-mid); }
+
+  /* ---------- final CTA ---------- */
+  .final { text-align: center; padding: 100px 0 90px; }
+  .final h2 { font-size: clamp(2rem, 5vw, 3.2rem); font-weight: 700; letter-spacing: -0.035em; line-height: 1.06; text-wrap: balance; max-width: 18ch; margin: 0 auto; }
+  .final .em { color: var(--green); text-shadow: 0 0 26px var(--glow); }
+  .final p { margin: 20px auto 0; color: var(--ink-dim); max-width: 48ch; font-size: 1.08rem; }
+  .final .cta-row { justify-content: center; }
+
+  /* ---------- footer ---------- */
+  footer { border-top: 1px solid var(--line-soft); padding: 40px 0 60px; }
+  .foot-inner { display: flex; flex-wrap: wrap; gap: 18px; align-items: center; justify-content: space-between; }
+  .foot-links { display: flex; flex-wrap: wrap; gap: 22px; font-family: var(--mono); font-size: 13.5px; color: var(--ink-dim); }
+  .foot-links a:hover { color: var(--green-mid); }
+  .foot-note { font-family: var(--mono); font-size: 12.5px; color: var(--ink-faint); }
+  .foot-note a { color: var(--ink-dim); text-decoration: underline; text-underline-offset: 3px; }
+
+  /* reveal */
+  .reveal { opacity: 0; transform: translateY(18px); transition: opacity 0.7s var(--ease), transform 0.7s var(--ease); }
+  .reveal.in { opacity: 1; transform: none; }
+
+  @media (max-width: 620px) {
+    .nav-links .hide-sm { display: none; }
+    header.hero { padding: 56px 0 16px; }
+    .ledger-body { padding: 24px 20px 26px; }
+    section { padding: 70px 0; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    .reveal { opacity: 1; transform: none; transition: none; }
+    .kicker .dot { animation: none; }
+    * { transition: none !important; }
+  }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-inner">
+    <a class="brand" href="#top"><img class="mark" src="/icon.png" alt="Tokenholic" width="28" height="28" /> tokenholic</a>
+    <div class="nav-links">
+      <a class="hide-sm" href="#how">How it works</a>
+      <a class="hide-sm" href="#features">Features</a>
+      <a href="https://github.com/conol-ai/tokenholic">GitHub</a>
+      <a class="nav-cta" href="https://github.com/conol-ai/tokenholic/releases/latest">Download</a>
+    </div>
+  </div>
+</nav>
+
+<a id="top"></a>
+<header class="hero">
+  <div class="wrap">
+    <span class="kicker reveal"><span class="dot"></span> macOS menubar · open source · validated against ccusage</span>
+    <h1 class="reveal">Your AI coding plan is <span class="em">earning</span> you money. See exactly how much.</h1>
+    <p class="sub reveal">Tokenholic reads your local usage logs and prices every token at what the API would have charged. Subtract your monthly subscription and the difference sits live in your menubar, updating as you code.</p>
+
+    <div class="cta-row reveal">
+      <a class="btn btn-primary" href="https://github.com/conol-ai/tokenholic/releases/latest">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0l4-4m-4 4l-4-4M5 21h14"/></svg>
+        Download for macOS
+      </a>
+      <a class="btn btn-ghost" href="https://github.com/conol-ai/tokenholic">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 .5A11.5 11.5 0 0 0 .5 12a11.5 11.5 0 0 0 7.86 10.92c.575.1.785-.25.785-.555 0-.275-.01-1-.015-1.965-3.2.695-3.875-1.54-3.875-1.54-.525-1.33-1.28-1.685-1.28-1.685-1.045-.715.08-.7.08-.7 1.155.08 1.765 1.185 1.765 1.185 1.025 1.76 2.69 1.25 3.345.955.105-.745.4-1.25.73-1.54-2.555-.29-5.24-1.275-5.24-5.675 0-1.255.45-2.28 1.185-3.085-.12-.29-.515-1.46.11-3.045 0 0 .965-.31 3.165 1.18a11 11 0 0 1 5.76 0c2.2-1.49 3.16-1.18 3.16-1.18.63 1.585.235 2.755.115 3.045.74.805 1.18 1.83 1.18 3.085 0 4.41-2.69 5.38-5.255 5.665.415.355.78 1.055.78 2.125 0 1.535-.015 2.77-.015 3.15 0 .305.205.66.79.545A11.5 11.5 0 0 0 23.5 12 11.5 11.5 0 0 0 12 .5Z"/></svg>
+        View source
+      </a>
+    </div>
+    <div class="meta-line reveal">
+      <span><b>GPL-3.0</b> licensed</span><span>·</span>
+      <span>macOS 14+</span><span>·</span>
+      <span>universal (Intel + Apple Silicon)</span><span>·</span>
+      <span><b>$0</b> — free forever</span>
+    </div>
+
+    <!-- the ledger: the product's actual headline number -->
+    <div class="panel-stage reveal">
+      <div class="ledger">
+        <div class="ledger-bar">
+          <span class="tl"></span><span class="tl"></span><span class="tl"></span>
+          <span class="title">Tokenholic — this billing cycle</span>
+        </div>
+        <div class="ledger-body">
+          <div class="ledger-label">NET EARNINGS THIS CYCLE</div>
+          <div class="earnings"><span class="pre">+$</span><span id="count">438.20</span></div>
+          <div class="earnings-sub">API-equivalent value of your tokens, minus what you actually paid · <span class="up">▲ on track</span></div>
+
+          <div class="calc">
+            <div class="row"><span class="k">Claude Code — tokens at API rates</span><span class="v pos">+$391.40</span></div>
+            <div class="row"><span class="k">Codex — tokens at API rates</span><span class="v pos">+$66.80</span></div>
+            <div class="row"><span class="k">Your subscriptions this cycle</span><span class="v neg">−$20.00</span></div>
+            <div class="row sum"><span class="k">Net earnings</span><span class="v">+$438.20</span></div>
+          </div>
+
+          <div class="spark">
+            <svg viewBox="0 0 600 54" preserveAspectRatio="none" aria-hidden="true">
+              <defs>
+                <linearGradient id="sg" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stop-color="oklch(0.86 0.20 158)" stop-opacity="0.28"/>
+                  <stop offset="100%" stop-color="oklch(0.86 0.20 158)" stop-opacity="0"/>
+                </linearGradient>
+              </defs>
+              <path d="M0,46 L40,42 L80,44 L120,36 L160,38 L200,30 L240,33 L280,24 L320,26 L360,18 L400,21 L440,14 L480,16 L520,9 L560,12 L600,6 L600,54 L0,54 Z" fill="url(#sg)"/>
+              <path d="M0,46 L40,42 L80,44 L120,36 L160,38 L200,30 L240,33 L280,24 L320,26 L360,18 L400,21 L440,14 L480,16 L520,9 L560,12 L600,6" fill="none" stroke="oklch(0.86 0.20 158)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+            </svg>
+            <div class="spark-cap">Daily value, this cycle — illustrative</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="strip">
+      <div class="strip-inner">
+        <span class="chip">Claude Code <span class="s ok">validated</span></span>
+        <span class="chip">Codex <span class="s ok">supported</span></span>
+        <span class="chip">Cursor <span class="s soon">planned</span></span>
+        <span class="chip">Pricing via LiteLLM</span>
+      </div>
+    </div>
+  </div>
+</header>
+
+<section id="how">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <h2>From raw session logs to a number you can trust</h2>
+      <p>Same data ccusage reads, same price table, same per-model math. The pipeline runs locally and reconciles to the cent.</p>
+    </div>
+    <div class="pipe">
+      <div class="step reveal">
+        <div class="n">01 · Collect</div>
+        <h3>Read local logs</h3>
+        <p>Tails <code>~/.claude/projects</code> and <code>~/.codex/sessions</code> with byte-offset incremental reads. New tools drop in behind one protocol.</p>
+      </div>
+      <div class="step reveal">
+        <div class="n">02 · Normalize</div>
+        <h3>Dedup &amp; clean</h3>
+        <p>Drops synthetic records and de-duplicates on message and request IDs, so nothing is double counted.</p>
+      </div>
+      <div class="step reveal">
+        <div class="n">03 · Price</div>
+        <h3>Exact API rates</h3>
+        <p>Looks up every model in the live LiteLLM table. The 5m and 1h prompt-cache tiers are priced separately, matching Anthropic's billing.</p>
+      </div>
+      <div class="step reveal">
+        <div class="n">04 · Earn</div>
+        <h3>Cycle math</h3>
+        <p>API-equivalent value minus your plan price, per tool and blended, across your billing cycle, with a daily series.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="features">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <h2>Built like the app it measures: precise, local, fast</h2>
+      <p>No dashboards to log into, no telemetry to opt out of. It lives in the menubar and updates the moment a session writes to disk.</p>
+    </div>
+
+    <div class="features">
+      <div class="feat span-2 reveal">
+        <div>
+          <div class="fi">◆ ACCURACY</div>
+          <h3>Reconciled to ccusage, to the cent</h3>
+          <p>Tokenholic isn't an estimate. It uses the <span class="hl">same LiteLLM price table</span> as ccusage, keyed by exact model id, fetched live and cached for 24 hours with an embedded offline fallback. Run <code>--dump</code> to print a full per-model breakdown and cross-check any number yourself.</p>
+        </div>
+        <div class="code-card">
+          <div class="cc-bar">.build/release/Tokenholic --dump</div>
+<pre><span class="cm"># per-model breakdown (cross-check vs ccusage)</span>
+claude-sonnet-4   in   1.42M  <span class="g">$  4.26</span>
+claude-sonnet-4   out  318K   <span class="g">$  4.77</span>
+cache-write-5m    2.1M        <span class="g">$  7.88</span>
+cache-read        9.8M        <span class="g">$  2.94</span>
+gpt-5-codex       out  402K   <span class="g">$  6.03</span>
+<span class="cm">─────────────────────────────</span>
+cycle value            <span class="g">$391.40</span>
+subscription           <span class="a">$ 20.00</span>
+<span class="g">net earnings           +$371.40</span></pre>
+        </div>
+      </div>
+
+      <div class="feat reveal">
+        <div class="fi">▲ LIVE</div>
+        <h3>Always-on menubar number</h3>
+        <p>FSEvents triggers an incremental rescan the instant a session writes; a 60-second timer refreshes the time-based windows. Click for per-tool cards, a daily sparkline, and your last 5 hours of value.</p>
+      </div>
+
+      <div class="feat reveal">
+        <div class="fi">⌥ NATIVE</div>
+        <h3>A real macOS agent</h3>
+        <p>Written in Swift 6 as a menubar agent with no Dock icon. Universal binary for Intel and Apple Silicon, ad-hoc or Developer-ID signed and notarized.</p>
+      </div>
+    </div>
+
+    <div class="duo">
+      <div class="feat reveal">
+        <div class="fi">⛁ PRIVATE BY DEFAULT</div>
+        <h3>Your logs never leave the Mac</h3>
+        <ul>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg> All parsing and pricing happens on-device.</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg> Optional sign-in syncs only a tiny per-device summary, not your prompts.</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg> Supabase Row-Level Security scopes every user to their own data.</li>
+        </ul>
+      </div>
+      <div class="feat reveal">
+        <div class="fi">⎇ SYNC</div>
+        <h3>One total across every device</h3>
+        <ul>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg> Sign in with Google or GitHub to combine all your Macs.</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg> Each device aggregates the rest; your subscription is counted once.</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg> The only key that ships is the anon key, which can't read anyone else.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="final-sec">
+  <div class="wrap final">
+    <h2 class="reveal">Find out what you're <span class="em">actually</span> getting for $20.</h2>
+    <p class="reveal">Build it from source or grab the signed DMG. macOS 14+, universal, free under GPL-3.0.</p>
+    <div class="cta-row reveal">
+      <a class="btn btn-primary" href="https://github.com/conol-ai/tokenholic/releases/latest">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0l4-4m-4 4l-4-4M5 21h14"/></svg>
+        Download for macOS
+      </a>
+      <a class="btn btn-ghost" href="https://github.com/conol-ai/tokenholic">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 .5A11.5 11.5 0 0 0 .5 12a11.5 11.5 0 0 0 7.86 10.92c.575.1.785-.25.785-.555 0-.275-.01-1-.015-1.965-3.2.695-3.875-1.54-3.875-1.54-.525-1.33-1.28-1.685-1.28-1.685-1.045-.715.08-.7.08-.7 1.155.08 1.765 1.185 1.765 1.185 1.025 1.76 2.69 1.25 3.345.955.105-.745.4-1.25.73-1.54-2.555-.29-5.24-1.275-5.24-5.675 0-1.255.45-2.28 1.185-3.085-.12-.29-.515-1.46.11-3.045 0 0 .965-.31 3.165 1.18a11 11 0 0 1 5.76 0c2.2-1.49 3.16-1.18 3.16-1.18.63 1.585.235 2.755.115 3.045.74.805 1.18 1.83 1.18 3.085 0 4.41-2.69 5.38-5.255 5.665.415.355.78 1.055.78 2.125 0 1.535-.015 2.77-.015 3.15 0 .305.205.66.79.545A11.5 11.5 0 0 0 23.5 12 11.5 11.5 0 0 0 12 .5Z"/></svg>
+        View on GitHub
+      </a>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap foot-inner">
+    <a class="brand" href="#top"><img class="mark" src="/icon.png" alt="Tokenholic" width="28" height="28" /> tokenholic</a>
+    <div class="foot-links">
+      <a href="https://github.com/conol-ai/tokenholic">GitHub</a>
+      <a href="https://github.com/conol-ai/tokenholic/releases/latest">Releases</a>
+      <a href="https://github.com/conol-ai/tokenholic/blob/main/README.md">Docs</a>
+      <a href="https://github.com/ryoppippi/ccusage">ccusage</a>
+      <a href="https://github.com/conol-ai/tokenholic/blob/main/LICENSE">GPL-3.0</a>
+    </div>
+    <div class="foot-note">© 2026 Tony Huang · built with <a href="https://github.com/BerriAI/litellm">LiteLLM</a> pricing</div>
+  </div>
+</footer>
+
+<script>
+  // count-up on the headline earnings number
+  (function () {
+    var prefersReduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    var el = document.getElementById("count");
+    var target = 438.20;
+    if (el && !prefersReduce) {
+      var start = null, dur = 1400;
+      function tick(t) {
+        if (!start) start = t;
+        var p = Math.min((t - start) / dur, 1);
+        var eased = 1 - Math.pow(1 - p, 4);
+        el.textContent = (target * eased).toFixed(2);
+        if (p < 1) requestAnimationFrame(tick);
+        else el.textContent = target.toFixed(2);
+      }
+      requestAnimationFrame(tick);
+    }
+  })();
+
+  // scroll reveal
+  (function () {
+    var prefersReduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    var els = document.querySelectorAll(".reveal");
+    if (prefersReduce || !("IntersectionObserver" in window)) {
+      els.forEach(function (e) { e.classList.add("in"); });
+      return;
+    }
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e, i) {
+        if (e.isIntersecting) {
+          var sib = Array.prototype.indexOf.call(e.target.parentNode.children, e.target);
+          e.target.style.transitionDelay = Math.min(sib * 60, 240) + "ms";
+          e.target.classList.add("in");
+          io.unobserve(e.target);
+        }
+      });
+    }, { threshold: 0.12, rootMargin: "0px 0px -8% 0px" });
+    els.forEach(function (e) { io.observe(e); });
+  })();
+</script>
+</body>
+</html>
