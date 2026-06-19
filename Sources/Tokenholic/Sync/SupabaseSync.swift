@@ -30,7 +30,7 @@ final class SupabaseSync: ObservableObject {
 
     init() {
         if SupabaseConfig.isConfigured, let url = SupabaseConfig.url {
-            client = SupabaseClient(supabaseURL: url, supabaseKey: SupabaseConfig.anonKey)
+            client = SupabaseClient(supabaseURL: url, supabaseKey: SupabaseConfig.publishableKey)
             available = true
         } else {
             client = nil
@@ -44,8 +44,10 @@ final class SupabaseSync: ObservableObject {
             for await state in client.auth.authStateChanges {
                 guard let self else { return }
                 switch state.event {
-                case .initialSession, .signedIn, .tokenRefreshed, .userUpdated:
-                    self.onSignedIn(state.session)
+                case .signedIn, .tokenRefreshed, .userUpdated:
+                    if let session = state.session { self.onSignedIn(session) }
+                case .initialSession:
+                    if let session = state.session { self.onSignedIn(session) } else { self.onSignedOut() }
                 case .signedOut:
                     self.onSignedOut()
                 default:
@@ -89,9 +91,9 @@ final class SupabaseSync: ObservableObject {
         }
     }
 
-    private func onSignedIn(_ session: Session?) {
+    private func onSignedIn(_ session: Session) {
         isSignedIn = true
-        userEmail = session?.user.email
+        userEmail = session.user.email
         lastError = nil
         startPolling()
         refreshPeers()

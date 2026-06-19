@@ -187,9 +187,7 @@ struct MenuBarContentView: View {
             Text("Sign in so every device's usage rolls into one combined total.")
                 .font(.caption2).foregroundStyle(.tertiary)
             HStack {
-                Button { model.signIn(.google) } label: {
-                    Label("Google", systemImage: "globe")
-                }
+                // Google sign-in is hidden until the Google provider is configured.
                 Button { model.signIn(.github) } label: {
                     Label("GitHub", systemImage: "chevron.left.forwardslash.chevron.right")
                 }
