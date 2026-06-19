@@ -98,9 +98,15 @@ final class AppModel: ObservableObject {
         watcher = DirectoryWatcher(paths: watchPaths) { [weak self] in
             Task { @MainActor in self?.refreshNow() }
         }
-        // Keep time-based windows current even with no file activity.
+        // Periodic re-scan + recompute. Re-scanning (not just recomputing the
+        // in-memory buckets) self-heals a missed/coalesced FSEvent — e.g. for a
+        // deeply nested subdir (subagents/, workflows/) created long after the
+        // watcher started — so freshly written usage is ingested within a minute
+        // instead of waiting for the next delivered event. refresh() is
+        // isRefreshing-guarded and the scan is incremental + off-main, so the
+        // recurring tree enumeration is cheap.
         timer = Timer.scheduledTimer(withTimeInterval: recomputeInterval, repeats: true) { [weak self] _ in
-            Task { @MainActor in self?.recompute() }
+            Task { @MainActor in self?.refreshNow() }
         }
         // Cross-device sync (Supabase): publish our totals, observe peers + auth.
         sync.start()
