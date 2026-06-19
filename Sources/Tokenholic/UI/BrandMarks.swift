@@ -33,20 +33,27 @@ struct ClaudeBurst: View {
 
     var body: some View {
         Canvas { ctx, size in
-            let c = CGPoint(x: size.width / 2, y: size.height / 2)
+            // Explicit CGFloat typing throughout: mixing CGFloat (size) with the
+            // Double results of cos/sin/.pi makes the type-checker time out on
+            // older toolchains (Swift 6.1 / CI).
+            let center = CGPoint(x: size.width / 2, y: size.height / 2)
             let spokes = 12
-            let inner = size.width * 0.05
-            let outer = size.width * 0.44
-            let width = size.width * 0.085
+            let inner: CGFloat = size.width * 0.05
+            let outer: CGFloat = size.width * 0.44
+            let lineWidth: CGFloat = size.width * 0.085
             for i in 0..<spokes {
-                let a = (Double(i) / Double(spokes)) * 2 * .pi - .pi / 2
+                let angle: Double = (Double(i) / Double(spokes)) * 2.0 * .pi - .pi / 2.0
+                let dx: CGFloat = CGFloat(cos(angle))
+                let dy: CGFloat = CGFloat(sin(angle))
+                let start = CGPoint(x: center.x + dx * inner, y: center.y + dy * inner)
+                let end = CGPoint(x: center.x + dx * outer, y: center.y + dy * outer)
                 var path = Path()
-                path.move(to: CGPoint(x: c.x + cos(a) * inner, y: c.y + sin(a) * inner))
-                path.addLine(to: CGPoint(x: c.x + cos(a) * outer, y: c.y + sin(a) * outer))
+                path.move(to: start)
+                path.addLine(to: end)
                 ctx.stroke(
                     path,
                     with: .color(color),
-                    style: StrokeStyle(lineWidth: width, lineCap: .round)
+                    style: StrokeStyle(lineWidth: lineWidth, lineCap: .round)
                 )
             }
         }
@@ -59,18 +66,20 @@ struct OpenAIMark: View {
 
     var body: some View {
         Canvas { ctx, size in
-            let c = CGPoint(x: size.width / 2, y: size.height / 2)
-            let petal = size.width * 0.23      // petal-circle radius
-            let offset = size.width * 0.19     // loops overlap into a six-fold knot
-            let width = size.width * 0.08      // solid strands without merging into a blob
+            // Explicit CGFloat typing — see ClaudeBurst for why.
+            let center = CGPoint(x: size.width / 2, y: size.height / 2)
+            let petal: CGFloat = size.width * 0.23      // petal-circle radius
+            let offset: CGFloat = size.width * 0.19     // loops overlap into a six-fold knot
+            let lineWidth: CGFloat = size.width * 0.08  // solid strands without merging into a blob
             for i in 0..<6 {
-                let a = (Double(i) / 6) * 2 * .pi
-                let pc = CGPoint(x: c.x + cos(a) * offset, y: c.y + sin(a) * offset)
-                let rect = CGRect(x: pc.x - petal, y: pc.y - petal, width: petal * 2, height: petal * 2)
+                let angle: Double = (Double(i) / 6.0) * 2.0 * .pi
+                let px: CGFloat = center.x + CGFloat(cos(angle)) * offset
+                let py: CGFloat = center.y + CGFloat(sin(angle)) * offset
+                let rect = CGRect(x: px - petal, y: py - petal, width: petal * 2, height: petal * 2)
                 ctx.stroke(
                     Circle().path(in: rect),
                     with: .color(color),
-                    style: StrokeStyle(lineWidth: width)
+                    style: StrokeStyle(lineWidth: lineWidth)
                 )
             }
         }
