@@ -176,55 +176,22 @@
   }
   .meta-line b { color: var(--ink-dim); font-weight: 500; }
 
-  /* ---------- the ledger panel (the product's actual headline number) ---------- */
-  .panel-stage { margin-top: 64px; perspective: 1400px; }
-  .ledger {
-    background: linear-gradient(180deg, var(--surface), var(--bg-deep));
+  /* ---------- product shot: the real menubar popover ---------- */
+  .shot-stage { margin-top: 60px; display: flex; flex-direction: column; align-items: center; }
+  .shot {
+    position: relative; width: 100%; max-width: 392px;
+    border-radius: 20px; overflow: hidden;
     border: 1px solid var(--line);
-    border-radius: 18px;
-    box-shadow: 0 40px 90px -30px oklch(0 0 0 / 0.7), inset 0 1px 0 oklch(1 0 0 / 0.04);
-    overflow: hidden;
-    max-width: 620px; margin: 0 auto;
+    box-shadow:
+      0 44px 100px -30px oklch(0 0 0 / 0.8),
+      inset 0 1px 0 oklch(1 0 0 / 0.05),
+      0 0 90px -14px var(--glow);
   }
-  .ledger-bar {
-    display: flex; align-items: center; gap: 8px;
-    padding: 13px 18px; border-bottom: 1px solid var(--line-soft);
-    background: oklch(0.18 0.008 165 / 0.7);
+  .shot img { display: block; width: 100%; height: auto; }
+  .shot-cap {
+    margin-top: 18px; font-family: var(--mono); font-size: 12px;
+    color: var(--ink-faint); text-align: center;
   }
-  .ledger-bar .tl { width: 11px; height: 11px; border-radius: 50%; background: var(--line); }
-  .ledger-bar .tl:nth-child(1){ background: oklch(0.55 0.16 25); }
-  .ledger-bar .tl:nth-child(2){ background: oklch(0.78 0.13 78); }
-  .ledger-bar .tl:nth-child(3){ background: var(--green-dim); }
-  .ledger-bar .title { margin-left: 8px; font-family: var(--mono); font-size: 12.5px; color: var(--ink-faint); }
-  .ledger-body { padding: 30px 30px 32px; }
-  .ledger-label { font-family: var(--mono); font-size: 12.5px; color: var(--ink-faint); letter-spacing: 0.02em; }
-  .earnings {
-    font-family: var(--mono); font-weight: 800;
-    font-size: clamp(2.8rem, 9vw, 4.4rem); line-height: 1; letter-spacing: -0.04em;
-    color: var(--green); margin: 8px 0 4px;
-    text-shadow: 0 0 28px var(--glow);
-    font-variant-numeric: tabular-nums;
-  }
-  .earnings .pre { color: var(--green-mid); }
-  .earnings-sub { font-family: var(--mono); font-size: 13px; color: var(--ink-dim); }
-  .earnings-sub .up { color: var(--green-mid); }
-
-  .calc {
-    margin-top: 26px; padding-top: 22px; border-top: 1px dashed var(--line);
-    display: grid; gap: 11px; font-family: var(--mono); font-size: 13.5px;
-  }
-  .calc .row { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; }
-  .calc .row .k { color: var(--ink-dim); }
-  .calc .row .v { font-variant-numeric: tabular-nums; }
-  .calc .row .v.pos { color: var(--green-mid); }
-  .calc .row .v.neg { color: var(--amber); }
-  .calc .row.sum { margin-top: 4px; padding-top: 12px; border-top: 1px solid var(--line-soft); }
-  .calc .row.sum .k { color: var(--ink); }
-  .calc .row.sum .v { color: var(--green); font-weight: 700; }
-
-  .spark { margin-top: 24px; }
-  .spark svg { width: 100%; height: 54px; display: block; }
-  .spark-cap { font-family: var(--mono); font-size: 11.5px; color: var(--ink-faint); margin-top: 6px; }
 
   /* ---------- logos / tools strip ---------- */
   .strip { margin-top: 60px; padding: 26px 0; border-top: 1px solid var(--line-soft); border-bottom: 1px solid var(--line-soft); }
@@ -359,41 +326,14 @@
       <span><b>$0</b> — free forever</span>
     </div>
 
-    <!-- the ledger: the product's actual headline number -->
-    <div class="panel-stage reveal">
-      <div class="ledger">
-        <div class="ledger-bar">
-          <span class="tl"></span><span class="tl"></span><span class="tl"></span>
-          <span class="title">Tokenholic — this billing cycle</span>
-        </div>
-        <div class="ledger-body">
-          <div class="ledger-label">NET EARNINGS THIS CYCLE</div>
-          <div class="earnings"><span class="pre">+$</span><span id="count">438.20</span></div>
-          <div class="earnings-sub">API-equivalent value of your tokens, minus what you actually paid · <span class="up">▲ on track</span></div>
-
-          <div class="calc">
-            <div class="row"><span class="k">Claude Code — tokens at API rates</span><span class="v pos">+$391.40</span></div>
-            <div class="row"><span class="k">Codex — tokens at API rates</span><span class="v pos">+$66.80</span></div>
-            <div class="row"><span class="k">Your subscriptions this cycle</span><span class="v neg">−$20.00</span></div>
-            <div class="row sum"><span class="k">Net earnings</span><span class="v">+$438.20</span></div>
-          </div>
-
-          <div class="spark">
-            <svg viewBox="0 0 600 54" preserveAspectRatio="none" aria-hidden="true">
-              <defs>
-                <linearGradient id="sg" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stop-color="oklch(0.86 0.20 158)" stop-opacity="0.28"/>
-                  <stop offset="100%" stop-color="oklch(0.86 0.20 158)" stop-opacity="0"/>
-                </linearGradient>
-              </defs>
-              <path d="M0,46 L40,42 L80,44 L120,36 L160,38 L200,30 L240,33 L280,24 L320,26 L360,18 L400,21 L440,14 L480,16 L520,9 L560,12 L600,6 L600,54 L0,54 Z" fill="url(#sg)"/>
-              <path d="M0,46 L40,42 L80,44 L120,36 L160,38 L200,30 L240,33 L280,24 L320,26 L360,18 L400,21 L440,14 L480,16 L520,9 L560,12 L600,6" fill="none" stroke="oklch(0.86 0.20 158)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
-            </svg>
-            <div class="spark-cap">Daily value, this cycle — illustrative</div>
-          </div>
-        </div>
+    <!-- the real menubar popover -->
+    <figure class="shot-stage reveal">
+      <div class="shot">
+        <img src="/screenshot.png" width="1080" height="1800" loading="eager" decoding="async"
+             alt="The Tokenholic menubar popover: net earnings this billing cycle in phosphor green, a daily API-value sparkline, and per-tool breakdowns for Claude Code and Codex, plus this-session and 7-day windows." />
       </div>
-    </div>
+      <figcaption class="shot-cap">Live in your menubar — updating as you code.</figcaption>
+    </figure>
 
     <div class="strip">
       <div class="strip-inner">
@@ -534,25 +474,6 @@ subscription           <span class="a">$ 20.00</span>
 </footer>
 
 <script>
-  // count-up on the headline earnings number
-  (function () {
-    var prefersReduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    var el = document.getElementById("count");
-    var target = 438.20;
-    if (el && !prefersReduce) {
-      var start = null, dur = 1400;
-      function tick(t) {
-        if (!start) start = t;
-        var p = Math.min((t - start) / dur, 1);
-        var eased = 1 - Math.pow(1 - p, 4);
-        el.textContent = (target * eased).toFixed(2);
-        if (p < 1) requestAnimationFrame(tick);
-        else el.textContent = target.toFixed(2);
-      }
-      requestAnimationFrame(tick);
-    }
-  })();
-
   // scroll reveal
   (function () {
     var prefersReduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;

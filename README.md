@@ -5,6 +5,11 @@ subscriptions** — i.e. what your token usage would cost at API rates versus wh
 you pay for your plan. Like [ccusage](https://github.com/ryoppippi/ccusage), but
 framed as subscription ROI and live in the menubar.
 
+<p align="center">
+  <img src="site/screenshot.png" width="360"
+       alt="The Tokenholic menubar popover: net earnings this billing cycle in phosphor green, a daily API-value sparkline, and per-tool breakdowns for Claude Code and Codex, plus this-session and 7-day windows." />
+</p>
+
 The headline number is your **net earnings this billing cycle**:
 
 ```
