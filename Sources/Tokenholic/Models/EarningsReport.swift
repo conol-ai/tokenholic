@@ -14,11 +14,13 @@ struct ToolSummary: Identifiable {
     var netUSD: Double { monthlyAPICostUSD - subscriptionUSD }
 }
 
-/// API-equivalent value for a single day (all tools combined), for the sparkline.
+/// API-equivalent value for a single day (all tools combined), for the sparkline
+/// and the daily leaderboard. `tokens` is the day's blended token count.
 struct DailyPoint: Identifiable {
     var id: Date { day }
     let day: Date
     let apiCostUSD: Double
+    var tokens: Int = 0
 }
 
 /// Token usage + API value over a time window (blended across tools).

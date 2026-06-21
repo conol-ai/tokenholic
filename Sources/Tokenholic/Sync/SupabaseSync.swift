@@ -28,14 +28,12 @@ final class SupabaseSync: ObservableObject {
     private let writeDebounce: TimeInterval = 10
     private let pollInterval: TimeInterval = 45
 
-    init() {
-        if SupabaseConfig.isConfigured, let url = SupabaseConfig.url {
-            client = SupabaseClient(supabaseURL: url, supabaseKey: SupabaseConfig.publishableKey)
-            available = true
-        } else {
-            client = nil
-            available = false
-        }
+    /// Takes the shared `SupabaseEnvironment` so this and `SocialService` use
+    /// ONE client and therefore one auth/Keychain session. `SupabaseSync`
+    /// remains the sole driver of the `authStateChanges` loop.
+    init(env: SupabaseEnvironment) {
+        client = env.client
+        available = env.available
     }
 
     func start() {

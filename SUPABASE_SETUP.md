@@ -19,6 +19,38 @@ every device shows one combined total. Auth is Google / GitHub. ~10 minutes.
 creates `device_snapshots` with RLS policies, an `updated_at` trigger, and the
 Realtime publication.
 
+## 2b. Add the social schema (friends + daily leaderboard)
+
+**SQL Editor** → paste and run [`supabase/social.sql`](supabase/social.sql). It
+is **idempotent and additive** (safe to re-run; it does not touch
+`device_snapshots`). It creates the `profiles`, `friendships`, `friend_requests`,
+`invite_codes`, and `daily_totals` tables plus the friendship-gated
+`SECURITY DEFINER` RPCs that power add-by-handle, invite links, and the daily
+leaderboard.
+
+Security model (why the public key stays safe with these tables):
+
+- **No cross-user `SELECT`.** `profiles` and `daily_totals` have no policy that
+  exposes another user's rows. Every cross-user read goes through a definer RPC
+  (`leaderboard_for_day`, `list_friends`, `list_requests`, `lookup_profile_by_handle`)
+  that first proves an **accepted friendship**.
+- **`daily_totals` is RPC-only** — direct `INSERT/UPDATE/DELETE` are revoked, so
+  the value/day/device caps and the monotonic `greatest()` clamp can't be bypassed.
+- **Invites are single-use, 24h** by default, and refuse blocked/revoked pairs.
+
+After running it, in **Authentication → Policies** spot-check that `daily_totals`
+has only a `daily_select_own` policy (no insert/update/delete). For the leaderboard
+metric the app reads the user's GitHub login from the OAuth identity, so keep the
+default GitHub provider scope (it returns `user_name`).
+
+Optional (recommended): enable **pg_cron** and schedule the retention prune, else
+`daily_totals` grows unbounded:
+
+```sql
+select cron.schedule('prune_daily_totals', '0 4 * * *',
+                      $$ select public.prune_daily_totals(60); $$);
+```
+
 ## 3. Allow the app's redirect
 
 **Authentication → URL Configuration → Redirect URLs** → add exactly (lowercase):

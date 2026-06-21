@@ -56,6 +56,10 @@ struct MenuBarContentView: View {
                 if model.isSignedIn { devicesCard } else { signInCard }
             }
 
+            if model.socialAvailable && model.isSignedIn {
+                friendsTeaser
+            }
+
             if !model.unpricedModels.isEmpty {
                 unpricedWarning
             }
@@ -68,6 +72,13 @@ struct MenuBarContentView: View {
         .environment(\.colorScheme, .dark)
         .foregroundStyle(Palette.ink)
         .tint(Palette.green)
+        .onAppear {
+            // Capture openWindow so an invite deep link can surface the window.
+            InviteRouter.openSocial = {
+                NSApp.activate(ignoringOtherApps: true)
+                openWindow(id: "social")
+            }
+        }
     }
 
     // MARK: - Header
@@ -86,6 +97,9 @@ struct MenuBarContentView: View {
     private var overflowMenu: some View {
         Menu {
             Button("Check for Updates…") { model.checkForUpdates() }
+            if model.socialAvailable && model.isSignedIn {
+                Button("Friends & Leaderboard…") { openSocial() }
+            }
             if model.syncAvailable {
                 Divider()
                 Toggle("Menu bar shows all devices", isOn: $model.menubarUsesCombined)
@@ -110,6 +124,13 @@ struct MenuBarContentView: View {
             .frame(width: 28, height: 28)
             .background(Circle().fill(Palette.card))
             .overlay(Circle().strokeBorder(Palette.stroke, lineWidth: 1))
+            .overlay(alignment: .topTrailing) {
+                if model.pendingRequestCount > 0 {
+                    Circle().fill(Palette.amber).frame(width: 7, height: 7)
+                        .overlay(Circle().strokeBorder(Palette.bg, lineWidth: 1.5))
+                        .offset(x: 1, y: -1)
+                }
+            }
             .contentShape(Circle())
     }
 
@@ -255,7 +276,7 @@ struct MenuBarContentView: View {
                     .font(.system(size: 12.5, weight: .semibold))
                     .foregroundStyle(Palette.ink)
             }
-            Text("Sign in so every device's usage rolls into one combined total.")
+            Text("Sign in so every device's usage rolls into one combined total — and climb the daily leaderboard with friends.")
                 .font(.system(size: 11.5))
                 .foregroundStyle(Palette.inkDim)
                 .fixedSize(horizontal: false, vertical: true)
@@ -268,6 +289,39 @@ struct MenuBarContentView: View {
             .buttonStyle(GhostButtonStyle())
         }
         .cardSurface()
+    }
+
+    // MARK: - Social teaser
+
+    /// Compact entry point to the Friends & Leaderboard window, with a pending-
+    /// request badge. The full social UI lives in its own resizable window.
+    private var friendsTeaser: some View {
+        Button(action: openSocial) {
+            HStack(spacing: 11) {
+                GlyphTile(systemName: "trophy.fill", tint: Palette.green, size: 34)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Friends & leaderboard")
+                        .font(.system(size: 13, weight: .semibold)).foregroundStyle(Palette.ink)
+                    Text(model.socialRankSubtitle)
+                        .font(.system(size: 11)).foregroundStyle(Palette.inkDim).lineLimit(1)
+                }
+                Spacer(minLength: 4)
+                if model.pendingRequestCount > 0 {
+                    Text("\(model.pendingRequestCount)")
+                        .font(.system(size: 10.5, weight: .bold)).foregroundStyle(Palette.bgDeep)
+                        .padding(.horizontal, 6).padding(.vertical, 2)
+                        .background(Capsule().fill(Palette.amber))
+                }
+                Image(systemName: "chevron.right").font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(Palette.inkFaint)
+            }
+            .padding(11)
+            .background(RoundedRectangle(cornerRadius: 13, style: .continuous).fill(Palette.card))
+            .overlay(RoundedRectangle(cornerRadius: 13, style: .continuous)
+                .strokeBorder(Palette.stroke, lineWidth: 1))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 
     // MARK: - Misc states
@@ -361,6 +415,11 @@ struct MenuBarContentView: View {
     private func openSettings() {
         NSApp.activate(ignoringOtherApps: true)
         openWindow(id: "settings")
+    }
+
+    private func openSocial() {
+        NSApp.activate(ignoringOtherApps: true)
+        openWindow(id: "social")
     }
 }
 
@@ -514,17 +573,3 @@ private struct FooterButton: View {
     }
 }
 
-private extension View {
-    /// Standard card chrome: padded, filled, hairline-bordered rounded rectangle.
-    func cardSurface() -> some View {
-        padding(12)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(
-                RoundedRectangle(cornerRadius: 13, style: .continuous).fill(Palette.card)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 13, style: .continuous)
-                    .strokeBorder(Palette.stroke, lineWidth: 1)
-            )
-    }
-}

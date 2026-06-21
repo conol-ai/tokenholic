@@ -17,6 +17,7 @@ enum Entry {
 
 struct TokenholicApp: App {
     @StateObject private var model = AppModel()
+    @NSApplicationDelegateAdaptor(TokenholicAppDelegate.self) private var appDelegate
 
     var body: some Scene {
         MenuBarExtra {
@@ -29,6 +30,13 @@ struct TokenholicApp: App {
 
         Window("Tokenholic Settings", id: "settings") {
             SettingsView()
+                .environmentObject(model)
+        }
+        .windowResizability(.contentSize)
+        .defaultPosition(.center)
+
+        Window("Tokenholic — Friends", id: "social") {
+            SocialView()
                 .environmentObject(model)
         }
         .windowResizability(.contentSize)

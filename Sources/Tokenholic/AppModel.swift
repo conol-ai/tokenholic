@@ -37,6 +37,32 @@ final class AppModel: ObservableObject {
     @Published private(set) var combinedNetUSD: Double = 0
     @Published private(set) var combinedTokens: Int = 0
 
+    // Social: friends + daily leaderboard (mirrors of SocialService) -------
+    @Published private(set) var socialAvailable = false
+    @Published private(set) var hasHandle = false
+    @Published private(set) var myHandle: String?
+    @Published private(set) var shareDaily = true
+    @Published private(set) var friends: [FriendRow] = []
+    @Published private(set) var incomingRequests: [RequestRow] = []
+    @Published private(set) var outgoingRequests: [RequestRow] = []
+    @Published private(set) var leaderboard: [LeaderboardRow] = []
+    @Published private(set) var currentInvite: InviteRow?
+    @Published private(set) var socialToast: SocialToast?
+
+    /// Count shown as the popover request badge.
+    var pendingRequestCount: Int { incomingRequests.count }
+
+    /// One-line teaser for the popover ("You're #2 today · 4 friends").
+    var socialRankSubtitle: String {
+        let n = friends.count
+        let friendsPhrase = "\(n) friend\(n == 1 ? "" : "s")"
+        if n == 0 { return "Add a friend to compete" }
+        if let idx = leaderboard.firstIndex(where: { $0.is_self }), leaderboard.count > 1 {
+            return "You're #\(idx + 1) today · \(friendsPhrase)"
+        }
+        return friendsPhrase
+    }
+
     // Auto-update -----------------------------------------------------------
     @Published private(set) var updateVersion: String?
     @Published private(set) var isDownloadingUpdate = false
@@ -50,7 +76,9 @@ final class AppModel: ObservableObject {
     // Internal state -------------------------------------------------------
     private var records: [UsageRecord] = []
     private let store = ClaudeUsageStore()
-    private let sync = SupabaseSync()
+    private let env = SupabaseEnvironment()
+    private lazy var sync = SupabaseSync(env: env)
+    private lazy var social = SocialService(env: env)
     private let updater = UpdateChecker()
     private var localSnapshot: DeviceSnapshot?
     private var cancellables = Set<AnyCancellable>()
@@ -117,6 +145,30 @@ final class AppModel: ObservableObject {
             .sink { [weak self] value in self?.isSignedIn = value }.store(in: &cancellables)
         sync.$userEmail.receive(on: RunLoop.main)
             .sink { [weak self] value in self?.signedInEmail = value }.store(in: &cancellables)
+        // Social: shares the same client/session. Forward auth in, mirror out.
+        social.start()
+        socialAvailable = social.available
+        InviteRouter.redeem = { [weak self] code in self?.redeemInvite(code: code) }
+        sync.$isSignedIn.receive(on: RunLoop.main)
+            .sink { [weak self] v in self?.social.onAuthChanged(isSignedIn: v) }.store(in: &cancellables)
+        social.$profile.receive(on: RunLoop.main).sink { [weak self] p in
+            self?.hasHandle = (p?.handle?.isEmpty == false)
+            self?.myHandle = p?.handle
+        }.store(in: &cancellables)
+        social.$shareDaily.receive(on: RunLoop.main)
+            .sink { [weak self] in self?.shareDaily = $0 }.store(in: &cancellables)
+        social.$friends.receive(on: RunLoop.main)
+            .sink { [weak self] in self?.friends = $0 }.store(in: &cancellables)
+        social.$incomingRequests.receive(on: RunLoop.main)
+            .sink { [weak self] in self?.incomingRequests = $0 }.store(in: &cancellables)
+        social.$outgoingRequests.receive(on: RunLoop.main)
+            .sink { [weak self] in self?.outgoingRequests = $0 }.store(in: &cancellables)
+        social.$leaderboard.receive(on: RunLoop.main)
+            .sink { [weak self] in self?.leaderboard = $0 }.store(in: &cancellables)
+        social.$currentInvite.receive(on: RunLoop.main)
+            .sink { [weak self] in self?.currentInvite = $0 }.store(in: &cancellables)
+        social.$toast.receive(on: RunLoop.main)
+            .sink { [weak self] in self?.socialToast = $0 }.store(in: &cancellables)
         // Auto-update: poll GitHub Releases.
         updater.start()
         updater.$available.receive(on: RunLoop.main)
@@ -129,6 +181,7 @@ final class AppModel: ObservableObject {
             MainActor.assumeIsolated {
                 guard let self else { return }
                 self.sync.flush(self.localSnapshot)
+                self.social.flushDaily()
             }
         }
     }
@@ -137,6 +190,20 @@ final class AppModel: ObservableObject {
     func signOut() { sync.signOut() }
     func downloadUpdate() { updater.downloadAndOpen() }
     func checkForUpdates() { updater.checkNow() }
+
+    // Social actions (forward to SocialService) ----------------------------
+    func claimHandle(_ handle: String, displayName: String? = nil) { social.claimHandle(handle, displayName: displayName) }
+    func setShareDaily(_ on: Bool) { social.setShareDaily(on) }
+    func sendFriendRequest(toHandle handle: String) { social.sendRequest(toHandle: handle) }
+    func sendFriendRequest(toUserId id: String) { social.sendRequest(toUserId: id) }
+    func acceptRequest(_ id: String) { social.acceptRequest(id) }
+    func declineRequest(_ id: String) { social.declineRequest(id) }
+    func removeFriend(_ id: String) { social.removeFriend(id) }
+    func blockUser(_ id: String) { social.blockUser(id) }
+    func createInvite() { social.createInvite() }
+    func redeemInvite(code: String) { social.redeemInvite(code: code) }
+    func refreshLeaderboard() { social.refreshLeaderboard() }
+    func setLeaderboardDay(_ key: String) { social.setLeaderboardDay(key) }
 
     func refreshNow() {
         Task { await refresh() }
@@ -232,7 +299,27 @@ final class AppModel: ObservableObject {
         )
         localSnapshot = snapshot
         sync.publish(snapshot)
+        social.publishDaily(makeDailyValueWrites())
         combine()
+    }
+
+    /// This device's recent per-day gross API value rows for the social
+    /// leaderboard. Only the last two local days are sent: the backend rejects
+    /// days outside a tight window, and only today/yesterday can still change.
+    private func makeDailyValueWrites() -> [DailyValueWrite] {
+        let cal = Calendar.current
+        let today = cal.startOfDay(for: Date())
+        guard let cutoff = cal.date(byAdding: .day, value: -1, to: today) else { return [] }
+        let dev = DeviceIdentity.id
+        let f = DateFormatter()
+        f.calendar = cal
+        f.timeZone = .current
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.dateFormat = "yyyy-MM-dd"
+        return dailyAPICost
+            .filter { $0.day >= cutoff }
+            .map { DailyValueWrite(device_id: dev, day: f.string(from: $0.day),
+                                   api_usd: $0.apiCostUSD, tokens: $0.tokens) }
     }
 
     /// Merge this device's in-memory totals with synced peers. Subscription is

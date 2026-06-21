@@ -18,6 +18,7 @@ enum EarningsCalculator {
         var report = EarningsReport()
         var unpriced = Set<String>()
         var dailyTotals: [Date: Double] = [:]
+        var dailyTokens: [Date: Int] = [:]
 
         for tool in Tool.allCases {
             let toolRecords = records.filter { $0.tool == tool }
@@ -55,13 +56,14 @@ enum EarningsCalculator {
             for r in cycle {
                 let day = calendar.startOfDay(for: r.timestamp)
                 dailyTotals[day, default: 0] += (r.apiEquivalentCostUSD ?? 0)
+                dailyTokens[day, default: 0] += r.totalTokens
             }
         }
 
         report.summaries.sort { $0.monthlyAPICostUSD > $1.monthlyAPICostUSD }
         report.unpricedModels = unpriced.sorted()
         report.dailyAPICost = dailyTotals
-            .map { DailyPoint(day: $0.key, apiCostUSD: $0.value) }
+            .map { DailyPoint(day: $0.key, apiCostUSD: $0.value, tokens: dailyTokens[$0.key] ?? 0) }
             .sorted { $0.day < $1.day }
 
         // Active 5h session window (blended across tools).

@@ -35,6 +35,16 @@ enum Palette {
 
     /// Earnings tint: green in the black, red in the red.
     static func money(_ value: Double) -> Color { value >= 0 ? green : red }
+
+    /// Stable accent for an avatar/handle. Uses a deterministic djb2 hash (NOT
+    /// String.hashValue, which is randomized per launch) so a handle keeps the
+    /// same color across sessions. Only ever picks from the existing accents.
+    static func avatarTint(for key: String) -> Color {
+        let accents = [green, amber, blue, orange]
+        var hash: UInt64 = 5381
+        for byte in key.lowercased().utf8 { hash = (hash &* 33) &+ UInt64(byte) }
+        return accents[Int(hash % UInt64(accents.count))]
+    }
 }
 
 /// The popover's full-bleed background: a dark base with a soft phosphor bloom at
@@ -92,5 +102,73 @@ extension View {
         overlay(alignment: .bottom) {
             Rectangle().fill(Palette.strokeSoft).frame(height: 1)
         }
+    }
+
+    /// Standard card chrome: padded, filled, hairline-bordered rounded rectangle.
+    /// Shared by the popover and the social views.
+    func cardSurface() -> some View {
+        padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: 13, style: .continuous).fill(Palette.card)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 13, style: .continuous)
+                    .strokeBorder(Palette.stroke, lineWidth: 1)
+            )
+    }
+}
+
+/// An initial on a hashed, stable accent tile — structurally identical to
+/// `GlyphTile`/`ToolIcon` (same corner math, same tint opacities). No remote
+/// image fetch: privacy-first, offline, and zero new asset pipeline.
+struct AvatarBadge: View {
+    let handle: String?
+    var size: CGFloat = 30
+
+    private var initial: String {
+        let h = (handle ?? "").trimmingCharacters(in: CharacterSet(charactersIn: "@ ")).uppercased()
+        return h.isEmpty ? "?" : String(h.prefix(1))
+    }
+    private var tint: Color { Palette.avatarTint(for: handle ?? "?") }
+
+    var body: some View {
+        RoundedRectangle(cornerRadius: size * 0.30, style: .continuous)
+            .fill(tint.opacity(0.15))
+            .overlay(
+                RoundedRectangle(cornerRadius: size * 0.30, style: .continuous)
+                    .strokeBorder(tint.opacity(0.20), lineWidth: 1)
+            )
+            .overlay(
+                Text(initial)
+                    .font(.system(size: size * 0.44, weight: .bold, design: .rounded))
+                    .foregroundStyle(tint)
+            )
+            .frame(width: size, height: size)
+    }
+}
+
+/// A small rank chip: gold / silver / bronze for 1–3, a plain faint number for
+/// 4+. A light podium feel without literal podium graphics.
+struct RankPill: View {
+    let rank: Int
+
+    private var tint: Color {
+        switch rank {
+        case 1:  return Palette.amber       // gold
+        case 2:  return Palette.inkDim      // silver
+        case 3:  return Palette.orange      // bronze
+        default: return Palette.inkFaint
+        }
+    }
+    private var isPodium: Bool { rank <= 3 }
+
+    var body: some View {
+        Text("\(rank)")
+            .font(.system(size: 12, weight: .bold, design: .rounded).monospacedDigit())
+            .foregroundStyle(isPodium ? Palette.bgDeep : Palette.inkFaint)
+            .frame(width: 22, height: 22)
+            .background(Circle().fill(isPodium ? tint : Palette.card))
+            .overlay(Circle().strokeBorder(isPodium ? tint.opacity(0.5) : Palette.stroke, lineWidth: 1))
     }
 }
