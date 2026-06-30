@@ -381,6 +381,25 @@
   .btn-x:hover { transform: translateY(-2px); box-shadow: 0 10px 30px oklch(0 0 0 / 0.4); }
   .btn-star { color: var(--green); border: 1px solid var(--green-dim); background: oklch(0.5 0.13 158 / 0.1); }
   .btn-star:hover { transform: translateY(-2px); border-color: var(--green); background: oklch(0.5 0.13 158 / 0.18); }
+
+  /* ---------- brew install snippet (copy-able) ---------- */
+  .brew {
+    display: inline-flex; align-items: stretch; max-width: 100%;
+    border: 1px solid var(--line); border-radius: 10px; overflow: hidden;
+    background: var(--bg-deep); font-family: var(--mono); font-size: 13px;
+    text-align: left;
+  }
+  .brew code { display: block; padding: 11px 14px; color: var(--ink-dim); white-space: pre; overflow-x: auto; line-height: 1.55; }
+  .brew code .v { color: var(--green-mid); }
+  .brew-copy {
+    flex: 0 0 auto; border: none; border-left: 1px solid var(--line);
+    background: var(--surface); color: var(--ink-dim); cursor: pointer;
+    padding: 0 14px; font-family: var(--mono); font-size: 12px; font-weight: 600;
+    transition: color 0.2s, background 0.2s;
+  }
+  .brew-copy:hover { color: var(--green); background: var(--surface-2); }
+  .brew-copy.copied { color: var(--green); }
+  .final .brew { margin: 22px auto 0; }
 </style>
 </head>
 <body>
@@ -416,7 +435,13 @@
         View source
       </a>
     </div>
+    <div class="brew reveal" role="group" aria-label="Install with Homebrew">
+      <code id="brew-cmd-hero"><span class="v">brew tap</span> conol-ai/tokenholic https://github.com/conol-ai/tokenholic
+<span class="v">brew install --cask</span> tokenholic</code>
+      <button type="button" class="brew-copy" aria-label="Copy the Homebrew install command">Copy</button>
+    </div>
     <div class="meta-line reveal">
+      <span><b>brew install</b> or DMG</span><span>·</span>
       <span><b>GPL-3.0</b> licensed</span><span>·</span>
       <span>macOS 14+</span><span>·</span>
       <span>universal (Intel + Apple Silicon)</span><span>·</span>
@@ -620,6 +645,11 @@ subscription           <span class="a">$ 20.00</span>
         <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 .5A11.5 11.5 0 0 0 .5 12a11.5 11.5 0 0 0 7.86 10.92c.575.1.785-.25.785-.555 0-.275-.01-1-.015-1.965-3.2.695-3.875-1.54-3.875-1.54-.525-1.33-1.28-1.685-1.28-1.685-1.045-.715.08-.7.08-.7 1.155.08 1.765 1.185 1.765 1.185 1.025 1.76 2.69 1.25 3.345.955.105-.745.4-1.25.73-1.54-2.555-.29-5.24-1.275-5.24-5.675 0-1.255.45-2.28 1.185-3.085-.12-.29-.515-1.46.11-3.045 0 0 .965-.31 3.165 1.18a11 11 0 0 1 5.76 0c2.2-1.49 3.16-1.18 3.16-1.18.63 1.585.235 2.755.115 3.045.74.805 1.18 1.83 1.18 3.085 0 4.41-2.69 5.38-5.255 5.665.415.355.78 1.055.78 2.125 0 1.535-.015 2.77-.015 3.15 0 .305.205.66.79.545A11.5 11.5 0 0 0 23.5 12 11.5 11.5 0 0 0 12 .5Z"/></svg>
         View on GitHub
       </a>
+    </div>
+    <div class="brew reveal" role="group" aria-label="Install with Homebrew">
+      <code id="brew-cmd-final"><span class="v">brew tap</span> conol-ai/tokenholic https://github.com/conol-ai/tokenholic
+<span class="v">brew install --cask</span> tokenholic</code>
+      <button type="button" class="brew-copy" aria-label="Copy the Homebrew install command">Copy</button>
     </div>
   </div>
 </section>
@@ -869,6 +899,38 @@ subscription           <span class="a">$ 20.00</span>
     }
 
     recompute();
+  })();
+
+  // ---------- copy-able brew install snippets ----------
+  (function () {
+    document.querySelectorAll(".brew").forEach(function (box) {
+      var code = box.querySelector("code");
+      var btn = box.querySelector(".brew-copy");
+      if (!code || !btn) return;
+      var label = btn.textContent; // fixed original label; never re-read live (avoids "Copied" sticking)
+      var timer;
+      btn.addEventListener("click", function () {
+        var text = code.textContent;
+        var done = function () {
+          btn.classList.add("copied");
+          btn.textContent = "Copied";
+          try { if (typeof gtag === "function") gtag("event", "brew_copy", { event_category: "install" }); } catch (e) {}
+          clearTimeout(timer);
+          timer = setTimeout(function () { btn.classList.remove("copied"); btn.textContent = label; }, 1600);
+        };
+        var fallback = function () {
+          try {
+            var ta = document.createElement("textarea");
+            ta.value = text; ta.style.position = "fixed"; ta.style.opacity = "0";
+            document.body.appendChild(ta); ta.select(); document.execCommand("copy");
+            document.body.removeChild(ta); done();
+          } catch (e) {}
+        };
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(text).then(done, fallback);
+        } else { fallback(); }
+      });
+    });
   })();
 
   // ---------- live GitHub star badge (cached, fails closed) ----------

@@ -158,3 +158,25 @@ jobs:
         with:
           files: ${{ env.DMG }}
           generate_release_notes: true
+
+      - name: Bump Homebrew cask (tags only)
+        # The cask lives in this repo (Casks/tokenholic.rb), so the built-in
+        # GITHUB_TOKEN (contents: write, above) can commit the bump back to main
+        # — no cross-repo token needed. Runner is macOS, so sed uses BSD syntax.
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          set -euo pipefail
+          SHA="$(shasum -a 256 "$DMG" | awk '{print $1}')"
+          echo "Bumping cask to v$VERSION ($SHA)"
+          git fetch origin main
+          git checkout -B main origin/main
+          sed -i '' -E "s|^( *version )\"[^\"]*\"|\1\"$VERSION\"|" Casks/tokenholic.rb
+          sed -i '' -E "s|^( *sha256 )\"[^\"]*\"|\1\"$SHA\"|" Casks/tokenholic.rb
+          if git diff --quiet -- Casks/tokenholic.rb; then
+            echo "Cask already current for v$VERSION"; exit 0
+          fi
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Casks/tokenholic.rb
+          git commit -m "cask: bump Tokenholic to v$VERSION [skip ci]"
+          git push origin main

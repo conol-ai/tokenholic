@@ -49,6 +49,22 @@ ccusage uses (fetched live, cached 24h, with an embedded offline fallback), keye
 by exact model id. The 5m/1h prompt-cache split is priced separately, matching
 Anthropic's billing.
 
+## Install
+
+**Homebrew (recommended)** — the native one-command path for the terminal crowd:
+
+```sh
+brew tap conol-ai/tokenholic https://github.com/conol-ai/tokenholic
+brew install --cask tokenholic
+```
+
+Upgrade any time with `brew upgrade --cask tokenholic` to stay on the latest pricing logic.
+
+**Direct download** — grab the latest signed `.dmg` from the
+[Releases page](https://github.com/conol-ai/tokenholic/releases/latest).
+
+**Build from source** — see [Requirements](#requirements) and [Build & run](#build--run) below.
+
 ## Requirements
 
 - macOS 14+

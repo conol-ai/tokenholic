@@ -19,6 +19,21 @@ Silicon) DMG, signs + notarizes it (when the secrets below are set), and attache
 it to a GitHub Release. You can also run it on demand: Actions → *Build DMG* →
 *Run workflow*.
 
+### Homebrew cask
+
+The same tagged run then **auto-bumps the Homebrew cask** (`Casks/tokenholic.rb`):
+it recomputes the DMG's `sha256`, updates `version` + `sha256`, and commits the
+change back to `main` (`cask: bump Tokenholic to vX.Y.Z [skip ci]`) using the
+built-in `GITHUB_TOKEN` — no extra secret. Users install with
+`brew tap conol-ai/tokenholic https://github.com/conol-ai/tokenholic` then
+`brew install --cask tokenholic`, and update with `brew upgrade --cask tokenholic`.
+
+To regenerate the cask by hand (e.g. for an older tag): `scripts/update-cask.sh [tag]`.
+
+> If `main` is a protected branch requiring PRs, the auto-push step will fail;
+> either allow the Actions bot to push, or run `scripts/update-cask.sh` and open
+> the bump PR yourself.
+
 ## Signing secrets (one-time, needs a paid Apple Developer account)
 
 Add under Settings → Secrets and variables → Actions:
