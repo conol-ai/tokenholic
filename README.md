@@ -1,14 +1,34 @@
-# Tokenholic
+<div align="center">
 
-A native macOS menubar app that shows how much you **earn from your AI coding
-subscriptions** — i.e. what your token usage would cost at API rates versus what
-you pay for your plan. Like [ccusage](https://github.com/ryoppippi/ccusage), but
-framed as subscription ROI and live in the menubar.
+# 🪙 Tokenholic
 
-<p align="center">
-  <img src="site/screenshot.png" width="360"
-       alt="The Tokenholic menubar popover: net earnings this billing cycle in phosphor green, a daily API-value sparkline, and per-tool breakdowns for Claude Code and Codex, plus this-session and 7-day windows." />
-</p>
+**See what your AI coding subscription is _actually_ earning you.**
+
+[![GitHub stars](https://img.shields.io/github/stars/conol-ai/tokenholic?style=flat&logo=github&color=2ea043)](https://github.com/conol-ai/tokenholic/stargazers)
+[![Latest release](https://img.shields.io/github/v/release/conol-ai/tokenholic?logo=github&color=2ea043)](https://github.com/conol-ai/tokenholic/releases/latest)
+[![License: GPL-3.0](https://img.shields.io/badge/license-GPL--3.0-blue)](LICENSE)
+[![Platform: macOS 14+ · universal](https://img.shields.io/badge/macOS-14%2B%20·%20universal-555)](#requirements)
+[![Validated against ccusage](https://img.shields.io/badge/validated%20against-ccusage-brightgreen)](https://github.com/ryoppippi/ccusage)
+
+[![Download for macOS](https://img.shields.io/badge/Download_for_macOS-2ea043?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/conol-ai/tokenholic/releases/latest)
+[![Star this repo](https://img.shields.io/badge/%E2%98%85_Star_this_repo-1f6feb?style=for-the-badge&logo=github&logoColor=white)](https://github.com/conol-ai/tokenholic)
+[![tokenholic.app](https://img.shields.io/badge/%F0%9F%8C%90_tokenholic.app-30363d?style=for-the-badge)](https://tokenholic.app)
+
+_If Tokenholic shows you a number you like, a ★ helps other developers find it._
+
+<img src="site/screenshot.png" width="340"
+     alt="The Tokenholic menubar popover: net earnings this billing cycle in phosphor green, a daily API-value sparkline, and per-tool breakdowns for Claude Code and Codex, plus this-session and 7-day windows." />
+
+</div>
+
+Your AI coding plan probably isn't a cost — it's a **profit center**. Tokenholic
+prices every token you burn in **Claude Code** and **Codex** at what the provider's
+API _would_ have charged, subtracts your flat monthly subscription, and shows the
+difference live in your menubar. A heavy month can read **+$371.40 net on a $20 plan**.
+
+It's [**ccusage**](https://github.com/ryoppippi/ccusage), but live in your menubar and
+framed as subscription **ROI** — same local logs, same LiteLLM price table, reconciled
+to the cent.
 
 The headline number is your **net earnings this billing cycle**:
 
@@ -93,6 +113,13 @@ are present, ad-hoc otherwise. See [RELEASING.md](RELEASING.md).
 - Cursor support (experimental; dashboard API + session cookie)
 - Supabase Realtime for live cross-device updates
 - Native Sign in with Apple (requires Developer ID)
+
+## Star history
+
+If Tokenholic earned you something, [give it a ★](https://github.com/conol-ai/tokenholic) —
+it's the cheapest way to help other developers find it.
+
+[![Star History Chart](https://api.star-history.com/svg?repos=conol-ai/tokenholic&type=Date)](https://star-history.com/#conol-ai/tokenholic&Date)
 
 ## License
 
