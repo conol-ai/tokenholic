@@ -191,6 +191,14 @@
       0 0 90px -14px var(--glow);
   }
   .shot img { display: block; width: 100%; height: auto; }
+  /* landscape live-demo variant */
+  .shot-demo { max-width: 620px; }
+  /* qualify with `.shot img` (0,2,1) so these beat `.shot img { display:block }` (0,1,1) above */
+  .shot img.demo-still { display: none; }
+  @media (prefers-reduced-motion: reduce) {
+    .shot img.demo-anim { display: none; }
+    .shot img.demo-still { display: block; } /* reduced-motion users get the still poster, not the GIF */
+  }
   .shot-cap {
     margin-top: 18px; font-family: var(--mono); font-size: 12px;
     color: var(--ink-faint); text-align: center;
@@ -451,13 +459,15 @@
       <span><b>$0</b> — free forever</span>
     </div>
 
-    <!-- the real menubar popover -->
+    <!-- the live menubar popover: number ticking up (animated); still poster for reduced-motion -->
     <figure class="shot-stage reveal">
-      <div class="shot">
-        <img src="/screenshot.png" width="1080" height="1800" loading="eager" decoding="async"
-             alt="The Tokenholic menubar popover: net earnings this billing cycle in phosphor green, a daily API-value sparkline, and per-tool breakdowns for Claude Code and Codex, plus this-session and 7-day windows." />
+      <div class="shot shot-demo">
+        <img class="demo-anim" src="/demo.gif" width="760" height="470" loading="eager" decoding="async"
+             alt="Tokenholic menubar popover: net earnings ticking up to +$371.40 with a daily API-value sparkline filling in, live as a coding session runs." />
+        <img class="demo-still" src="/demo-poster.png" width="760" height="470" loading="eager" decoding="async"
+             alt="Tokenholic menubar popover showing +$371.40 net this cycle: $391.40 of API-rate value minus a $20 plan, with a daily sparkline." />
       </div>
-      <figcaption class="shot-cap">Live in your menubar — updating as you code.</figcaption>
+      <figcaption class="shot-cap">Live in your menubar — the number moves as you code.</figcaption>
     </figure>
 
     <div class="strip">

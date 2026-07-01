@@ -16,8 +16,10 @@
 
 _If Tokenholic shows you a number you like, a ★ helps other developers find it._
 
-<img src="site/screenshot.png" width="340"
-     alt="The Tokenholic menubar popover: net earnings this billing cycle in phosphor green, a daily API-value sparkline, and per-tool breakdowns for Claude Code and Codex, plus this-session and 7-day windows." />
+<img src="site/demo.gif" width="480"
+     alt="Tokenholic menubar demo: net earnings ticking up to +$371.40 with a daily API-value sparkline filling in, live as a coding session runs." />
+
+<sub>Live in your menubar — the number moves as you code. (<a href="site/screenshot.png">static screenshot</a>)</sub>
 
 </div>
 
