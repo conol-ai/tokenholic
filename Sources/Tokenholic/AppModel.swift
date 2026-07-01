@@ -70,6 +70,7 @@ final class AppModel: ObservableObject {
     // Persisted settings (UI-editable) ------------------------------------
     @Published var claudeMonthlyPriceUSD: Double { didSet { persist(); recompute() } }
     @Published var codexMonthlyPriceUSD: Double { didSet { persist(); recompute() } }
+    @Published var geminiMonthlyPriceUSD: Double { didSet { persist(); recompute() } }
     @Published var billingAnchorDay: Int { didSet { persist(); recompute() } }
     @Published var menubarUsesCombined: Bool { didSet { persist(); applyMenubarTitle() } }
 
@@ -92,6 +93,7 @@ final class AppModel: ObservableObject {
     private enum Keys {
         static let claudePrice = "claudeMonthlyPriceUSD"
         static let codexPrice = "codexMonthlyPriceUSD"
+        static let geminiPrice = "geminiMonthlyPriceUSD"
         static let billingDay = "billingAnchorDay"
         static let menubarCombined = "menubarUsesCombined"
     }
@@ -104,12 +106,16 @@ final class AppModel: ObservableObject {
         if defaults.object(forKey: Keys.codexPrice) == nil {
             defaults.set(0, forKey: Keys.codexPrice) // opt-in: user sets their ChatGPT plan price
         }
+        if defaults.object(forKey: Keys.geminiPrice) == nil {
+            defaults.set(0, forKey: Keys.geminiPrice) // opt-in: most Gemini CLI use is free / pay-as-you-go
+        }
         if defaults.object(forKey: Keys.billingDay) == nil {
             defaults.set(1, forKey: Keys.billingDay)
         }
         // didSet does not fire for assignments inside init.
         self.claudeMonthlyPriceUSD = defaults.double(forKey: Keys.claudePrice)
         self.codexMonthlyPriceUSD = defaults.double(forKey: Keys.codexPrice)
+        self.geminiMonthlyPriceUSD = defaults.double(forKey: Keys.geminiPrice)
         self.billingAnchorDay = max(1, defaults.integer(forKey: Keys.billingDay))
         self.menubarUsesCombined = defaults.bool(forKey: Keys.menubarCombined)
         start()
@@ -123,6 +129,10 @@ final class AppModel: ObservableObject {
         var watchPaths = [ClaudeDataLocation.projects.path]
         let codexPath = CodexDataLocation.sessions.path
         if FileManager.default.fileExists(atPath: codexPath) { watchPaths.append(codexPath) }
+        let geminiLog = GeminiDataLocation.telemetryLog
+        if FileManager.default.fileExists(atPath: geminiLog) {
+            watchPaths.append((geminiLog as NSString).deletingLastPathComponent)
+        }
         watcher = DirectoryWatcher(paths: watchPaths) { [weak self] in
             Task { @MainActor in self?.refreshNow() }
         }
@@ -220,9 +230,12 @@ final class AppModel: ObservableObject {
         let codexRaw = await Task.detached(priority: .utility) {
             (try? CodexCollector().collect()) ?? []
         }.value
+        let geminiRaw = await Task.detached(priority: .utility) {
+            (try? GeminiCliCollector().collect()) ?? []
+        }.value
 
         let engine = PricingEngine(table: priceTable)
-        records = Normalizer.dedup(claudeRaw + codexRaw).map { record in
+        records = Normalizer.dedup(claudeRaw + codexRaw + geminiRaw).map { record in
             var r = record
             r.apiEquivalentCostUSD = engine.cost(for: r)
             return r
@@ -250,6 +263,7 @@ final class AppModel: ObservableObject {
         switch tool {
         case .claudeCode: return claudeMonthlyPriceUSD
         case .codex: return codexMonthlyPriceUSD
+        case .geminiCli: return geminiMonthlyPriceUSD
         case .cursor: return 0 // not in v1
         }
     }
@@ -356,6 +370,7 @@ final class AppModel: ObservableObject {
         let defaults = UserDefaults.standard
         defaults.set(claudeMonthlyPriceUSD, forKey: Keys.claudePrice)
         defaults.set(codexMonthlyPriceUSD, forKey: Keys.codexPrice)
+        defaults.set(geminiMonthlyPriceUSD, forKey: Keys.geminiPrice)
         defaults.set(billingAnchorDay, forKey: Keys.billingDay)
         defaults.set(menubarUsesCombined, forKey: Keys.menubarCombined)
     }

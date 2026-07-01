@@ -18,7 +18,8 @@ enum DebugDump {
 
         let claudePriced = priceAll((try? ClaudeCollector().collect()) ?? [])
         let codexPriced = priceAll((try? CodexCollector().collect()) ?? [])
-        let priced = claudePriced + codexPriced
+        let geminiPriced = priceAll((try? GeminiCliCollector().collect()) ?? [])
+        let priced = claudePriced + codexPriced + geminiPriced
 
         let claudePrice = PlanDetector.claudeDefaultMonthlyPrice()
         let codexPrice = 0.0
@@ -30,6 +31,7 @@ enum DebugDump {
                 switch tool {
                 case .claudeCode: return claudePrice
                 case .codex: return codexPrice
+                case .geminiCli: return 0
                 case .cursor: return 0
                 }
             },

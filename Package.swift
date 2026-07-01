@@ -21,6 +21,13 @@ let package = Package(
                 // collector/refresh actor boundaries are settled.
                 .swiftLanguageMode(.v5)
             ]
+        ),
+        .testTarget(
+            name: "TokenholicTests",
+            dependencies: ["Tokenholic"],
+            path: "Tests/TokenholicTests",
+            resources: [.copy("Fixtures")],
+            swiftSettings: [.swiftLanguageMode(.v5)]
         )
     ]
 )

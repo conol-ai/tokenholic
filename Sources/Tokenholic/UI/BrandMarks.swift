@@ -106,6 +106,10 @@ struct ToolIcon: View {
         switch tool {
         case .claudeCode: ClaudeBurst()
         case .codex:      OpenAIMark()
+        case .geminiCli:
+            Image(systemName: "sparkles")
+                .font(.system(size: size * 0.4, weight: .semibold))
+                .foregroundStyle(Color(red: 0.56, green: 0.62, blue: 0.98))
         case .cursor:
             Image(systemName: "cursorarrow.rays")
                 .font(.system(size: size * 0.4, weight: .semibold))
@@ -118,6 +122,7 @@ struct ToolIcon: View {
         // Near-neutral dark tiles, matching the reference (the glyph carries the color).
         case .claudeCode: return Color.white.opacity(0.05)
         case .codex:      return Color.white.opacity(0.05)
+        case .geminiCli:  return Color.white.opacity(0.05)
         case .cursor:     return Color.white.opacity(0.05)
         }
     }

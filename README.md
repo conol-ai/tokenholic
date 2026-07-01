@@ -44,6 +44,7 @@ API-equivalent cost of this cycle's tokens  −  your monthly subscription price
 |------|--------|--------|
 | **Claude Code** | `~/.claude/projects/**/*.jsonl` (local) | ✅ validated against ccusage to the cent |
 | **Codex** | `~/.codex/sessions/**/*.jsonl` (local) | ✅ OpenAI sessions |
+| **Gemini CLI** | `~/.gemini/telemetry.log` (local) | ✅ opt-in — [enable local telemetry](https://google-gemini.github.io/gemini-cli/docs/cli/telemetry.html) |
 | **Cursor** | dashboard API (cookie) | ▢ planned (experimental) |
 
 Pricing comes from the same [LiteLLM price table](https://github.com/BerriAI/litellm)

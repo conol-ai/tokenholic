@@ -1,0 +1,48 @@
+{
+  "hrTime": [ 1782912221, 100000000 ],
+  "attributes": {
+    "session.id": "sess-abc",
+    "event.name": "gemini_cli.config",
+    "event.timestamp": "2026-07-01T13:23:41.100Z",
+    "model": "gemini-2.5-pro"
+  },
+  "severityText": null,
+  "body": null
+}
+{
+  "hrTime": [ 1782912222, 400000000 ],
+  "attributes": {
+    "session.id": "sess-abc",
+    "event.name": "gemini_cli.api_response",
+    "event.timestamp": "2026-07-01T13:23:42.413Z",
+    "model": "gemini-2.5-pro",
+    "duration_ms": 1010.5,
+    "input_token_count": 1500,
+    "output_token_count": 400,
+    "cached_content_token_count": 300,
+    "thoughts_token_count": 100,
+    "tool_token_count": 0,
+    "total_token_count": 2000,
+    "auth_type": "gemini-api-key"
+  },
+  "severityText": null,
+  "body": null
+}
+{
+  "hrTime": [ 1782912250, 0 ],
+  "attributes": {
+    "session.id": "sess-abc",
+    "event.name": "gemini_cli.api_response",
+    "event.timestamp": "2026-07-01T13:24:10.000Z",
+    "model": "gemini-2.5-flash",
+    "input_token_count": 800,
+    "output_token_count": 250,
+    "cached_content_token_count": 0,
+    "thoughts_token_count": 0,
+    "tool_token_count": 0,
+    "total_token_count": 1050,
+    "auth_type": "gemini-api-key"
+  },
+  "severityText": null,
+  "body": null
+}

@@ -14,6 +14,7 @@ struct SettingsView: View {
             Section {
                 planField("Claude plan", value: $model.claudeMonthlyPriceUSD)
                 planField("ChatGPT / Codex plan", value: $model.codexMonthlyPriceUSD)
+                planField("Gemini CLI plan", value: $model.geminiMonthlyPriceUSD)
             } header: {
                 Text("Subscriptions")
             } footer: {

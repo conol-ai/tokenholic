@@ -6,6 +6,7 @@ import Foundation
 enum Tool: String, Codable, CaseIterable, Identifiable, Sendable {
     case claudeCode
     case codex
+    case geminiCli
     case cursor
 
     var id: String { rawValue }
@@ -14,6 +15,7 @@ enum Tool: String, Codable, CaseIterable, Identifiable, Sendable {
         switch self {
         case .claudeCode: return "Claude Code"
         case .codex: return "Codex"
+        case .geminiCli: return "Gemini CLI"
         case .cursor: return "Cursor"
         }
     }
@@ -23,6 +25,7 @@ enum Tool: String, Codable, CaseIterable, Identifiable, Sendable {
         switch self {
         case .claudeCode: return "anthropic"
         case .codex: return "openai"
+        case .geminiCli: return "google"
         case .cursor: return "cursor"
         }
     }

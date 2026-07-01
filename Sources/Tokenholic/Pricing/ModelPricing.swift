@@ -24,6 +24,11 @@ enum ModelPricing {
         if m.contains("haiku") { return "claude-haiku-4-5" }
         if m.contains("fable") { return "claude-fable-5" }
         if m.contains("gpt-5") || m.contains("gpt5") { return "gpt-5.5" }
+        if m.contains("gemini") {
+            if m.contains("flash-lite") { return "gemini-2.5-flash-lite" }
+            if m.contains("flash") { return "gemini-2.5-flash" }
+            return "gemini-2.5-pro"
+        }
         return nil
     }
 }
