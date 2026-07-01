@@ -24,6 +24,11 @@ struct MenuBarContentView: View {
 
             hero
 
+            // Peak delight: only ask people to brag/star when they're in the black.
+            if model.blendedNetUSD > 0 {
+                delightRow
+            }
+
             if model.dailyAPICost.count >= 2,
                model.dailyAPICost.contains(where: { $0.apiCostUSD > 0 }) {
                 VStack(alignment: .leading, spacing: 7) {
@@ -421,6 +426,30 @@ struct MenuBarContentView: View {
         NSApp.activate(ignoringOtherApps: true)
         openWindow(id: "social")
     }
+
+    // MARK: - Peak-delight share / star
+
+    /// A quiet share + star row, shown under the hero only when the user is in
+    /// the black — the moment they're most willing to brag and to star the repo.
+    private var delightRow: some View {
+        HStack(spacing: 8) {
+            FooterShareButton(text: shareText)
+            FooterButton(title: "Star Tokenholic", icon: "star.fill", tint: Palette.green) { openRepo() }
+            Spacer(minLength: 0)
+        }
+    }
+
+    /// Pre-filled brag text using the live net number + the site URL.
+    private var shareText: String {
+        "My AI coding subscription is earning me \(CurrencyFormat.signed(model.blendedNetUSD))/mo "
+        + "over what I pay for it 🤑 — priced at real API rates by Tokenholic. https://tokenholic.app"
+    }
+
+    private func openRepo() {
+        if let url = URL(string: "https://github.com/conol-ai/tokenholic") {
+            NSWorkspace.shared.open(url)
+        }
+    }
 }
 
 // MARK: - Tool card
@@ -542,6 +571,32 @@ private struct DetailGrid: View {
     }
 }
 
+/// The icon+label chrome shared by the footer's `FooterButton` and the
+/// share-sheet trigger, so both read identically.
+private struct FooterLabel: View {
+    let title: String
+    var icon: String?
+    var tint: Color = Palette.inkDim
+    var hover: Bool = false
+
+    var body: some View {
+        HStack(spacing: 6) {
+            if let icon {
+                Image(systemName: icon).font(.system(size: 12, weight: .semibold))
+            }
+            Text(title).font(.system(size: 12.5, weight: .medium))
+        }
+        .foregroundStyle(tint)
+        .padding(.horizontal, 11)
+        .padding(.vertical, 6)
+        .background(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(Color.white.opacity(hover ? 0.06 : 0))
+        )
+        .contentShape(Rectangle())
+    }
+}
+
 /// A footer action: an icon+label button that highlights on hover.
 private struct FooterButton: View {
     let title: String
@@ -553,20 +608,26 @@ private struct FooterButton: View {
 
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 6) {
-                if let icon {
-                    Image(systemName: icon).font(.system(size: 12, weight: .semibold))
-                }
-                Text(title).font(.system(size: 12.5, weight: .medium))
-            }
-            .foregroundStyle(tint)
-            .padding(.horizontal, 11)
-            .padding(.vertical, 6)
-            .background(
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .fill(Color.white.opacity(hover ? 0.06 : 0))
-            )
-            .contentShape(Rectangle())
+            FooterLabel(title: title, icon: icon, tint: tint, hover: hover)
+        }
+        .buttonStyle(.plain)
+        .onHover { hover = $0 }
+    }
+}
+
+/// The macOS share sheet, wrapped so it wears the same chrome as `FooterButton`.
+/// `ShareLink` presents the system picker without needing an NSView anchor —
+/// menubar-agent friendly (no Dock activation surprise).
+private struct FooterShareButton: View {
+    let text: String
+    var title: String = "Share earnings"
+    var tint: Color = Palette.green
+
+    @State private var hover = false
+
+    var body: some View {
+        ShareLink(item: text) {
+            FooterLabel(title: title, icon: "square.and.arrow.up", tint: tint, hover: hover)
         }
         .buttonStyle(.plain)
         .onHover { hover = $0 }

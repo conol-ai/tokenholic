@@ -55,6 +55,15 @@ struct SettingsView: View {
                 }
                 .disabled(model.isDownloadingUpdate)
             }
+
+            Section("About") {
+                Link(destination: URL(string: "https://github.com/conol-ai/tokenholic")!) {
+                    Label("Star Tokenholic on GitHub", systemImage: "star")
+                }
+                Link(destination: URL(string: "https://tokenholic.app")!) {
+                    Label("tokenholic.app", systemImage: "globe")
+                }
+            }
         }
         .formStyle(.grouped)
         .frame(width: 420, height: 500)
