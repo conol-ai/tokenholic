@@ -331,19 +331,58 @@ struct MenuBarContentView: View {
 
     // MARK: - Misc states
 
-    private var emptyState: some View {
-        HStack(spacing: 10) {
-            if model.status == .loading {
+    @ViewBuilder private var emptyState: some View {
+        // A genuine loading state during the first scan; the guided checklist
+        // only after a completed scan finds zero records.
+        if model.status == .idle || model.status == .loading {
+            HStack(spacing: 10) {
                 ProgressView().controlSize(.small)
-                Text("Reading Claude Code logs…").foregroundStyle(Palette.inkDim)
-            } else {
-                Image(systemName: "tray").foregroundStyle(Palette.inkFaint)
-                Text("No usage found in this billing cycle yet.").foregroundStyle(Palette.inkDim)
+                Text("Reading your usage logs…").foregroundStyle(Palette.inkDim)
             }
+            .font(.system(size: 12.5))
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.vertical, 20)
+        } else {
+            guidedEmptyState
         }
-        .font(.system(size: 12.5))
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.vertical, 20)
+    }
+
+    private var toolProbes: [FirstRunGuide.Row] {
+        let fm = FileManager.default
+        let gemini = fm.fileExists(atPath: GeminiDataLocation.telemetryLog)
+        return [
+            .init(tool: .claudeCode,
+                  detected: fm.fileExists(atPath: ClaudeDataLocation.projects.path),
+                  note: "~/.claude/projects"),
+            .init(tool: .codex,
+                  detected: fm.fileExists(atPath: CodexDataLocation.sessions.path),
+                  note: "~/.codex/sessions"),
+            .init(tool: .geminiCli,
+                  detected: gemini,
+                  note: gemini ? "~/.gemini/telemetry.log" : "needs local telemetry"),
+        ]
+    }
+
+    /// True when no tool has a plan price — earnings can't be computed until one is set.
+    private var noPlanPriceSet: Bool {
+        model.claudeMonthlyPriceUSD == 0
+            && model.codexMonthlyPriceUSD == 0
+            && model.geminiMonthlyPriceUSD == 0
+    }
+
+    private var guidedEmptyState: some View {
+        FirstRunGuide(
+            rows: toolProbes,
+            showPlanNudge: noPlanPriceSet,
+            onEnableGemini: openGeminiTelemetryDocs,
+            onOpenSettings: openSettings
+        )
+    }
+
+    private func openGeminiTelemetryDocs() {
+        if let url = URL(string: "https://google-gemini.github.io/gemini-cli/docs/cli/telemetry.html") {
+            NSWorkspace.shared.open(url)
+        }
     }
 
     private func updateBanner(_ version: String) -> some View {
@@ -568,6 +607,78 @@ private struct DetailGrid: View {
                 .font(.system(size: 11.5))
             }
         }
+    }
+}
+
+/// First-run / empty-state activation guide: a calm, tool-aware checklist shown
+/// when a completed scan finds zero usage, so a new user learns *why* they see
+/// nothing and *what to do*. Presentational (data injected) so it renders in
+/// isolation for snapshot tests.
+struct FirstRunGuide: View {
+    struct Row: Identifiable {
+        let tool: Tool
+        let detected: Bool
+        let note: String
+        var id: String { tool.rawValue }
+    }
+    let rows: [Row]
+    let showPlanNudge: Bool
+    var onEnableGemini: () -> Void = {}
+    var onOpenSettings: () -> Void = {}
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 8) {
+                Image(systemName: "tray").foregroundStyle(Palette.inkFaint)
+                Text("No usage in this cycle yet")
+                    .font(.system(size: 13, weight: .semibold)).foregroundStyle(Palette.ink)
+            }
+            Text("Tokenholic reads your local AI-coding logs and updates live the moment a session writes usage.")
+                .font(.system(size: 11.5)).foregroundStyle(Palette.inkDim)
+                .fixedSize(horizontal: false, vertical: true)
+
+            VStack(spacing: 8) {
+                ForEach(rows) { row in
+                    HStack(spacing: 9) {
+                        Image(systemName: row.detected ? "checkmark.circle.fill" : "circle")
+                            .font(.system(size: 12))
+                            .foregroundStyle(row.detected ? Palette.green : Palette.inkFaint)
+                        Text(row.tool.displayName)
+                            .font(.system(size: 12, weight: .medium)).foregroundStyle(Palette.ink)
+                        Spacer(minLength: 6)
+                        if row.tool == .geminiCli && !row.detected {
+                            Button(action: onEnableGemini) {
+                                Text("enable →")
+                                    .font(.system(size: 11, weight: .semibold))
+                                    .foregroundStyle(Palette.green)
+                            }
+                            .buttonStyle(.plain)
+                        } else {
+                            Text(row.note)
+                                .font(.system(size: 10.5, design: .monospaced))
+                                .foregroundStyle(Palette.inkFaint)
+                        }
+                    }
+                }
+            }
+            .padding(11)
+            .background(RoundedRectangle(cornerRadius: 11, style: .continuous).fill(Palette.card))
+            .overlay(RoundedRectangle(cornerRadius: 11, style: .continuous).strokeBorder(Palette.stroke, lineWidth: 1))
+
+            if showPlanNudge {
+                Button(action: onOpenSettings) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "gearshape")
+                        Text("Set your plan price in Settings so we can compute earnings →")
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .font(.system(size: 11.5)).foregroundStyle(Palette.amber)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.vertical, 4)
     }
 }
 

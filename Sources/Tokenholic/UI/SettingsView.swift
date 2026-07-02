@@ -57,7 +57,18 @@ struct SettingsView: View {
                 .disabled(model.isDownloadingUpdate)
             }
 
-            Section("About") {
+            Section {
+                Link(destination: URL(string: "https://google-gemini.github.io/gemini-cli/docs/cli/telemetry.html")!) {
+                    Label("Enable Gemini CLI tracking", systemImage: "sparkles")
+                }
+            } header: {
+                Text("About")
+            } footer: {
+                Text("Gemini CLI is tracked only when its local telemetry is enabled (off by default).")
+                    .font(.caption2).foregroundStyle(.secondary)
+            }
+
+            Section {
                 Link(destination: URL(string: "https://github.com/conol-ai/tokenholic")!) {
                     Label("Star Tokenholic on GitHub", systemImage: "star")
                 }
