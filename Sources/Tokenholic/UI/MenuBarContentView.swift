@@ -57,12 +57,15 @@ struct MenuBarContentView: View {
                 }
             }
 
-            if model.syncAvailable {
-                if model.isSignedIn { devicesCard } else { signInCard }
-            }
+            // Cloud/social surfaces only exist when cloud mode is opted into.
+            if model.cloudModeEnabled {
+                if model.syncAvailable {
+                    if model.isSignedIn { devicesCard } else { signInCard }
+                }
 
-            if model.socialAvailable && model.isSignedIn {
-                friendsTeaser
+                if model.socialAvailable && model.isSignedIn {
+                    friendsTeaser
+                }
             }
 
             if !model.unpricedModels.isEmpty {
@@ -103,14 +106,16 @@ struct MenuBarContentView: View {
         Menu {
             Button("Check for Updates…") { model.checkForUpdates() }
             Button("Send feedback…") { Feedback.openNewIssue(hasUsage: !model.toolSummaries.isEmpty) }
-            if model.socialAvailable && model.isSignedIn {
-                Button("Friends & Leaderboard…") { openSocial() }
-            }
-            if model.syncAvailable {
-                Divider()
-                Toggle("Menu bar shows all devices", isOn: $model.menubarUsesCombined)
-                if model.isSignedIn {
-                    Button("Sign out of sync") { model.signOut() }
+            if model.cloudModeEnabled {
+                if model.socialAvailable && model.isSignedIn {
+                    Button("Friends & Leaderboard…") { openSocial() }
+                }
+                if model.syncAvailable {
+                    Divider()
+                    Toggle("Menu bar shows all devices", isOn: $model.menubarUsesCombined)
+                    if model.isSignedIn {
+                        Button("Sign out of sync") { model.signOut() }
+                    }
                 }
             }
             Divider()

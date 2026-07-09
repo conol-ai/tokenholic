@@ -40,9 +40,18 @@ struct SettingsView: View {
                             LoginItem.openSystemSettings()
                         }
                     }
-                if model.syncAvailable {
+            }
+
+            Section {
+                Toggle("Enable cloud sync & social (experimental)", isOn: $model.cloudModeEnabled)
+                if model.cloudModeEnabled && model.syncAvailable {
                     Toggle("Menu bar shows all-devices total", isOn: $model.menubarUsesCombined)
                 }
+            } header: {
+                Text("Cloud")
+            } footer: {
+                Text("Off by default — Tokenholic stays fully local. When on, a small per-device usage summary is synced so you can combine devices and compete with friends.")
+                    .font(.caption2).foregroundStyle(.secondary)
             }
 
             Section("Updates") {

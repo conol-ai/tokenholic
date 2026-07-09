@@ -73,6 +73,11 @@ final class AppModel: ObservableObject {
     @Published var geminiMonthlyPriceUSD: Double { didSet { persist(); recompute() } }
     @Published var billingAnchorDay: Int { didSet { persist(); recompute() } }
     @Published var menubarUsesCombined: Bool { didSet { persist(); applyMenubarTitle() } }
+    /// Off by default. When false, all cross-device sync + social UI and network
+    /// activity is quarantined: the app is local-only, account-free. When true,
+    /// cloud sync + social start up and their UI reappears (still further gated
+    /// by `isSignedIn` / `socialAvailable`).
+    @Published var cloudModeEnabled: Bool { didSet { persist(); applyCloudMode() } }
 
     // Internal state -------------------------------------------------------
     private var records: [UsageRecord] = []
@@ -88,6 +93,7 @@ final class AppModel: ObservableObject {
     private var priceTable: [String: ModelPrice] = [:]
     private var priceTableLoadedAt: Date?
     private var isRefreshing = false
+    private var cloudStarted = false
     private let recomputeInterval: TimeInterval = 60
 
     private enum Keys {
@@ -96,6 +102,7 @@ final class AppModel: ObservableObject {
         static let geminiPrice = "geminiMonthlyPriceUSD"
         static let billingDay = "billingAnchorDay"
         static let menubarCombined = "menubarUsesCombined"
+        static let cloudMode = "cloudModeEnabled"
     }
 
     init() {
@@ -118,6 +125,8 @@ final class AppModel: ObservableObject {
         self.geminiMonthlyPriceUSD = defaults.double(forKey: Keys.geminiPrice)
         self.billingAnchorDay = max(1, defaults.integer(forKey: Keys.billingDay))
         self.menubarUsesCombined = defaults.bool(forKey: Keys.menubarCombined)
+        // Off by default (bool default is false) — a brand-new user is local-only.
+        self.cloudModeEnabled = defaults.bool(forKey: Keys.cloudMode)
         start()
     }
 
@@ -146,6 +155,33 @@ final class AppModel: ObservableObject {
         timer = Timer.scheduledTimer(withTimeInterval: recomputeInterval, repeats: true) { [weak self] _ in
             Task { @MainActor in self?.refreshNow() }
         }
+        // Cross-device sync + social are quarantined behind cloud mode (off by
+        // default): no network activity or subscriptions until the user opts in.
+        if cloudModeEnabled { startCloud() }
+        // Auto-update: poll GitHub Releases.
+        updater.start()
+        updater.$available.receive(on: RunLoop.main)
+            .sink { [weak self] in self?.updateVersion = $0?.version }.store(in: &cancellables)
+        updater.$isDownloading.receive(on: RunLoop.main)
+            .sink { [weak self] in self?.isDownloadingUpdate = $0 }.store(in: &cancellables)
+        NotificationCenter.default.addObserver(
+            forName: NSApplication.willTerminateNotification, object: nil, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self, self.cloudStarted else { return }
+                self.sync.flush(self.localSnapshot)
+                self.social.flushDaily()
+            }
+        }
+    }
+
+    /// Boot cross-device sync + social and wire their published state into ours.
+    /// Idempotent: guarded so a runtime cloud-mode toggle can only start it once.
+    /// Never called while `cloudModeEnabled` is false, so a local-only user
+    /// performs no sign-in and opens no social subscriptions.
+    private func startCloud() {
+        guard !cloudStarted else { return }
+        cloudStarted = true
         // Cross-device sync (Supabase): publish our totals, observe peers + auth.
         sync.start()
         syncAvailable = sync.available
@@ -179,21 +215,16 @@ final class AppModel: ObservableObject {
             .sink { [weak self] in self?.currentInvite = $0 }.store(in: &cancellables)
         social.$toast.receive(on: RunLoop.main)
             .sink { [weak self] in self?.socialToast = $0 }.store(in: &cancellables)
-        // Auto-update: poll GitHub Releases.
-        updater.start()
-        updater.$available.receive(on: RunLoop.main)
-            .sink { [weak self] in self?.updateVersion = $0?.version }.store(in: &cancellables)
-        updater.$isDownloading.receive(on: RunLoop.main)
-            .sink { [weak self] in self?.isDownloadingUpdate = $0 }.store(in: &cancellables)
-        NotificationCenter.default.addObserver(
-            forName: NSApplication.willTerminateNotification, object: nil, queue: .main
-        ) { [weak self] _ in
-            MainActor.assumeIsolated {
-                guard let self else { return }
-                self.sync.flush(self.localSnapshot)
-                self.social.flushDaily()
-            }
-        }
+        // Peers/auth may already be settled; refresh the derived title now.
+        combine()
+    }
+
+    /// React to a cloud-mode change. Turning it on boots cloud once; turning it
+    /// off leaves already-established sessions in place but the UI hides all
+    /// cloud/social surfaces and the headline reverts to the local number.
+    private func applyCloudMode() {
+        if cloudModeEnabled { startCloud() }
+        applyMenubarTitle()
     }
 
     func signIn(_ provider: SupabaseSync.AuthProvider) { sync.signIn(provider) }
@@ -362,7 +393,9 @@ final class AppModel: ObservableObject {
     }
 
     private func applyMenubarTitle() {
-        let useCombined = menubarUsesCombined && deviceRows.count > 1
+        // The headline is the LOCAL net number by default; the combined figure is
+        // used only when the user has opted into cloud mode, chosen it, and signed in.
+        let useCombined = cloudModeEnabled && menubarUsesCombined && isSignedIn
         menubarTitle = CurrencyFormat.signedCompact(useCombined ? combinedNetUSD : blendedNetUSD)
     }
 
@@ -373,5 +406,6 @@ final class AppModel: ObservableObject {
         defaults.set(geminiMonthlyPriceUSD, forKey: Keys.geminiPrice)
         defaults.set(billingAnchorDay, forKey: Keys.billingDay)
         defaults.set(menubarUsesCombined, forKey: Keys.menubarCombined)
+        defaults.set(cloudModeEnabled, forKey: Keys.cloudMode)
     }
 }
