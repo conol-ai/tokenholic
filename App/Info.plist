@@ -2,39 +2,38 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-    <key>CFBundleName</key>
-    <string>Tokenholic</string>
-    <key>CFBundleDisplayName</key>
-    <string>Tokenholic</string>
-    <key>CFBundleIdentifier</key>
-    <string>ai.conol.Tokenholic</string>
-    <key>CFBundleExecutable</key>
-    <string>Tokenholic</string>
-    <key>CFBundleIconFile</key>
-    <string>AppIcon</string>
-    <key>CFBundlePackageType</key>
-    <string>APPL</string>
-    <key>CFBundleShortVersionString</key>
-    <string>0.7.0</string>
-    <key>CFBundleVersion</key>
-    <string>7</string>
-    <key>LSMinimumSystemVersion</key>
-    <string>14.0</string>
-    <!-- Agent app: no Dock icon, menubar only. -->
-    <key>LSUIElement</key>
-    <true/>
-    <key>NSHumanReadableCopyright</key>
-    <string>Tokenholic — subscription earnings tracker</string>
-    <key>CFBundleURLTypes</key>
-    <array>
-        <dict>
-            <key>CFBundleURLName</key>
-            <string>ai.conol.Tokenholic.auth</string>
-            <key>CFBundleURLSchemes</key>
-            <array>
-                <string>ai.conol.tokenholic</string>
-            </array>
-        </dict>
-    </array>
+	<key>CFBundleDisplayName</key>
+	<string>Tokenholic</string>
+	<key>CFBundleExecutable</key>
+	<string>Tokenholic</string>
+	<key>CFBundleIconFile</key>
+	<string>AppIcon</string>
+	<key>CFBundleIdentifier</key>
+	<string>ai.conol.Tokenholic</string>
+	<key>CFBundleName</key>
+	<string>Tokenholic</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>0.8.0</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>ai.conol.Tokenholic.auth</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>ai.conol.tokenholic</string>
+			</array>
+		</dict>
+	</array>
+	<key>CFBundleVersion</key>
+	<string>7</string>
+	<key>LSMinimumSystemVersion</key>
+	<string>14.0</string>
+	<key>LSUIElement</key>
+	<true/>
+	<key>NSHumanReadableCopyright</key>
+	<string>Tokenholic — subscription earnings tracker</string>
 </dict>
 </plist>
