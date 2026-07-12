@@ -58,6 +58,19 @@ struct SettingsView: View {
             }
 
             Section {
+                Button {
+                    Feedback.openNewIssue(hasUsage: !model.toolSummaries.isEmpty)
+                } label: {
+                    Label("Report an issue / send feedback", systemImage: "exclamationmark.bubble")
+                }
+            } header: {
+                Text("Feedback")
+            } footer: {
+                Text("Opens a pre-filled GitHub issue with your app + macOS version and which logs were detected — no prompts, token counts, or personal data. Nothing is sent until you submit.")
+                    .font(.caption2).foregroundStyle(.secondary)
+            }
+
+            Section {
                 Link(destination: URL(string: "https://google-gemini.github.io/gemini-cli/docs/cli/telemetry.html")!) {
                     Label("Enable Gemini CLI tracking", systemImage: "sparkles")
                 }

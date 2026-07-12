@@ -1,0 +1,46 @@
+name: Bug report
+description: Something's wrong or looks off in Tokenholic
+labels: ["bug"]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What did you see, and what did you expect instead?
+      placeholder: e.g. the menubar shows $0 even though I've been using Claude Code all day.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Tokenholic version
+      placeholder: v0.7.0
+    validations:
+      required: false
+  - type: input
+    id: macos
+    attributes:
+      label: macOS version
+      placeholder: "14.5"
+    validations:
+      required: false
+  - type: dropdown
+    id: tools
+    attributes:
+      label: Which tools should it be tracking?
+      multiple: true
+      options:
+        - Claude Code
+        - Codex
+        - Gemini CLI
+        - Cursor
+        - Other
+    validations:
+      required: false
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: Privacy
+      options:
+        - label: This report contains no prompt content, token counts, or personal data.
+          required: true

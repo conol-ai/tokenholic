@@ -1,0 +1,20 @@
+name: Feature or tool request
+description: Request support for another AI coding tool, or suggest an improvement
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: request
+    attributes:
+      label: What would you like?
+      description: A new tool to track (Copilot, Aider, Windsurf, …), or an improvement to an existing one.
+      placeholder: e.g. please track GitHub Copilot usage.
+    validations:
+      required: true
+  - type: input
+    id: tool
+    attributes:
+      label: Tool / log source (if requesting a new collector)
+      description: If you know where the tool writes local usage logs, that speeds things up a lot.
+      placeholder: e.g. GitHub Copilot — logs somewhere under ~/…
+    validations:
+      required: false

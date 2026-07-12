@@ -102,6 +102,7 @@ struct MenuBarContentView: View {
     private var overflowMenu: some View {
         Menu {
             Button("Check for Updates…") { model.checkForUpdates() }
+            Button("Send feedback…") { Feedback.openNewIssue(hasUsage: !model.toolSummaries.isEmpty) }
             if model.socialAvailable && model.isSignedIn {
                 Button("Friends & Leaderboard…") { openSocial() }
             }
@@ -375,7 +376,8 @@ struct MenuBarContentView: View {
             rows: toolProbes,
             showPlanNudge: noPlanPriceSet,
             onEnableGemini: openGeminiTelemetryDocs,
-            onOpenSettings: openSettings
+            onOpenSettings: openSettings,
+            onFeedback: { Feedback.openNewIssue(hasUsage: false) }
         )
     }
 
@@ -625,6 +627,7 @@ struct FirstRunGuide: View {
     let showPlanNudge: Bool
     var onEnableGemini: () -> Void = {}
     var onOpenSettings: () -> Void = {}
+    var onFeedback: () -> Void = {}
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -676,6 +679,12 @@ struct FirstRunGuide: View {
                 }
                 .buttonStyle(.plain)
             }
+
+            Button(action: onFeedback) {
+                Text("Something look off? Send feedback →")
+                    .font(.system(size: 11)).foregroundStyle(Palette.inkFaint)
+            }
+            .buttonStyle(.plain)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.vertical, 4)

@@ -133,6 +133,12 @@ are present, ad-hoc otherwise. See [RELEASING.md](RELEASING.md).
 - Supabase Realtime for live cross-device updates
 - Native Sign in with Apple (requires Developer ID)
 
+## Feedback
+
+Something look off, or want another tool supported? **[Open an issue](https://github.com/conol-ai/tokenholic/issues/new/choose)** —
+or use **⋯ → Send feedback** inside the app, which pre-fills your app / macOS version and which
+logs were detected (no prompt content, token counts, or personal data).
+
 ## Star history
 
 If Tokenholic earned you something, [give it a ★](https://github.com/conol-ai/tokenholic) —

@@ -1,0 +1,9 @@
+# Keep blank issues on so the in-app "Send feedback" (pre-filled ?body=…) works.
+blank_issues_enabled: true
+contact_links:
+  - name: Tokenholic website
+    url: https://tokenholic.app
+    about: What Tokenholic does and how it prices your AI usage.
+  - name: Docs / README
+    url: https://github.com/conol-ai/tokenholic#readme
+    about: Setup, supported tools, and how earnings are computed — for questions that aren't bugs.
