@@ -1,6 +1,6 @@
 cask "tokenholic" do
-  version "0.8.0"
-  sha256 "d92848b910ef5a734ded077792fddd1008595259af48beb1846406a92ccc9538"
+  version "0.8.1"
+  sha256 "6aaa8a69cbbfb73100c4f7094d99a6723ac96f7dbd137115b9d1dbffaf269e5f"
 
   url "https://github.com/conol-ai/tokenholic/releases/download/v#{version}/Tokenholic-#{version}.dmg",
       verified: "github.com/conol-ai/tokenholic/"
