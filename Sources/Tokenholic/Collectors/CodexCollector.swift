@@ -33,6 +33,10 @@ struct CodexCollector: UsageCollector {
 }
 
 enum CodexParser {
+    /// Hidden Codex support models run as separate sessions but are not part of
+    /// the user's coding workload and have no public API-equivalent price.
+    private static let internalModels: Set<String> = ["codex-auto-review"]
+
     static func parseFile(at url: URL) -> [UsageRecord] {
         guard let data = try? Data(contentsOf: url) else { return [] }
         let sessionId = url.deletingPathExtension().lastPathComponent
@@ -59,8 +63,10 @@ enum CodexParser {
             }
         }
 
-        // Only OpenAI sessions are API-priceable, and we need a resolved model.
-        guard provider == "openai", let model else { return [] }
+        // Only user-facing OpenAI sessions are API-priceable. In particular,
+        // auto-review is an internal permission check, not a coding session.
+        guard provider == "openai", let model,
+              !internalModels.contains(model.lowercased()) else { return [] }
 
         var previousInput = 0, previousCached = 0, previousOutput = 0
         var records: [UsageRecord] = []
