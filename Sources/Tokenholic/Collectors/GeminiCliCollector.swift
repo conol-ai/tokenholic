@@ -26,9 +26,8 @@ struct GeminiCliCollector: UsageCollector {
     var logPath: String = GeminiDataLocation.telemetryLog
 
     func collect() throws -> [UsageRecord] {
-        guard let data = FileManager.default.contents(atPath: logPath),
-              let text = String(data: data, encoding: .utf8) else { return [] }
-        return Self.parse(text, sourcePath: logPath)
+        guard let data = FileManager.default.contents(atPath: logPath) else { return [] }
+        return Self.parse(data: data, sourcePath: logPath).records
     }
 
     // MARK: - Parsing (pure; unit-testable without the filesystem)
@@ -36,10 +35,20 @@ struct GeminiCliCollector: UsageCollector {
     private static let API_RESPONSE = "gemini_cli.api_response"
 
     static func parse(_ text: String, sourcePath: String) -> [UsageRecord] {
+        parse(data: Data(text.utf8), sourcePath: sourcePath).records
+    }
+
+    /// Byte-level parse of a blob of concatenated JSON objects. Returns the
+    /// records plus how many bytes were consumed — an incomplete trailing
+    /// object is left unconsumed so an incremental reader can retry it once
+    /// more of the file has been written.
+    static func parse(data: Data, sourcePath: String) -> (records: [UsageRecord], consumed: Int) {
         var out: [UsageRecord] = []
-        for chunk in topLevelJSONObjects(in: text) {
-            guard let data = chunk.data(using: .utf8),
-                  let rec = try? JSONDecoder().decode(LogRecord.self, from: data),
+        let (ranges, consumed) = topLevelJSONRanges(in: data)
+        // One decoder for the whole blob rather than one per object.
+        let decoder = JSONDecoder()
+        for range in ranges {
+            guard let rec = try? decoder.decode(LogRecord.self, from: data[range]),
                   let a = rec.attributes,
                   a.eventName == API_RESPONSE,
                   let model = a.model, !model.isEmpty else { continue }
@@ -75,42 +84,52 @@ struct GeminiCliCollector: UsageCollector {
                 sourcePath: sourcePath
             ))
         }
-        return out
+        return (out, consumed)
     }
 
-    /// Split a stream of concatenated JSON objects into individual object
-    /// substrings by tracking brace depth (string- and escape-aware).
-    private static func topLevelJSONObjects(in text: String) -> [String] {
-        var objects: [String] = []
+    /// Split a stream of concatenated JSON objects into byte ranges of complete
+    /// top-level objects by tracking brace depth (string- and escape-aware),
+    /// plus the number of bytes consumed (i.e. the end of the last complete
+    /// object). Scanning raw UTF-8 bytes avoids the cost of walking a Swift
+    /// `String` by grapheme-aware `String.Index`, which dominated this parse.
+    private static func topLevelJSONRanges(in data: Data) -> (ranges: [Range<Data.Index>], consumed: Int) {
+        var ranges: [Range<Data.Index>] = []
         var depth = 0
         var inString = false
         var escaped = false
-        var start: String.Index?
-        var i = text.startIndex
-        while i < text.endIndex {
-            let c = text[i]
+        var start: Data.Index?
+        var consumed = 0
+
+        let quote = UInt8(ascii: "\""), backslash = UInt8(ascii: "\\")
+        let open = UInt8(ascii: "{"), close = UInt8(ascii: "}")
+
+        for i in data.indices {
+            let byte = data[i]
             if inString {
                 if escaped { escaped = false }
-                else if c == "\\" { escaped = true }
-                else if c == "\"" { inString = false }
+                else if byte == backslash { escaped = true }
+                else if byte == quote { inString = false }
             } else {
-                switch c {
-                case "\"": inString = true
-                case "{":
+                switch byte {
+                case quote: inString = true
+                case open:
                     if depth == 0 { start = i }
                     depth += 1
-                case "}":
+                case close:
+                    // Guard against stray '}' outside any object.
+                    guard depth > 0 else { break }
                     depth -= 1
                     if depth == 0, let s = start {
-                        objects.append(String(text[s...i]))
+                        let end = data.index(after: i)
+                        ranges.append(s..<end)
+                        consumed = data.distance(from: data.startIndex, to: end)
                         start = nil
                     }
                 default: break
                 }
             }
-            i = text.index(after: i)
         }
-        return objects
+        return (ranges, consumed)
     }
 
     private static let isoFractional: ISO8601DateFormatter = {

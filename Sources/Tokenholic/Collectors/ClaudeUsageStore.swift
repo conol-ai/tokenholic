@@ -11,19 +11,29 @@ actor ClaudeUsageStore {
     private var fileSizes: [String: UInt64] = [:]
     private var fileOffsets: [String: UInt64] = [:]
     private var recordsByFile: [String: [UsageRecord]] = [:]
+    /// Flattened view of `recordsByFile`, rebuilt only when a file actually
+    /// changes. Without this, every scan re-flattened the entire history (tens
+    /// of thousands of records) just to hand back an unchanged array.
+    private var cachedAll: [UsageRecord]?
 
     init(directory: URL = ClaudeDataLocation.projects) {
         self.directory = directory
     }
 
-    func scan() -> [UsageRecord] {
+    /// Returns every known record, plus whether this scan ingested anything new
+    /// — callers use that to skip re-deduping and re-pricing unchanged data.
+    @discardableResult
+    func scan() -> (records: [UsageRecord], changed: Bool) {
         let fm = FileManager.default
         guard let enumerator = fm.enumerator(at: directory, includingPropertiesForKeys: [.fileSizeKey]) else {
-            return allRecords()
+            return (allRecords(), false)
         }
 
+        var changed = false
+        var seen = Set<String>()
         for case let url as URL in enumerator where url.pathExtension == "jsonl" {
             let path = url.path
+            seen.insert(path)
             let size = ((try? url.resourceValues(forKeys: [.fileSizeKey]))?.fileSize).map(UInt64.init) ?? 0
 
             if let previous = fileSizes[path] {
@@ -43,12 +53,28 @@ actor ClaudeUsageStore {
                 fileOffsets[path] = offset
             }
             fileSizes[path] = size
+            changed = true
         }
-        return allRecords()
+
+        // Drop state for transcripts that no longer exist, so a long-running app
+        // doesn't hold records (and offsets) for deleted sessions forever.
+        // Key-based, not count-based: one delete plus one add leaves the counts
+        // equal but the stale entry still present.
+        if fileSizes.keys.contains(where: { !seen.contains($0) }) {
+            fileSizes = fileSizes.filter { seen.contains($0.key) }
+            fileOffsets = fileOffsets.filter { seen.contains($0.key) }
+            recordsByFile = recordsByFile.filter { seen.contains($0.key) }
+            changed = true
+        }
+        if changed { cachedAll = nil }
+        return (allRecords(), changed)
     }
 
     private func allRecords() -> [UsageRecord] {
-        recordsByFile.values.flatMap { $0 }
+        if let cachedAll { return cachedAll }
+        let all = recordsByFile.values.flatMap { $0 }
+        cachedAll = all
+        return all
     }
 
     /// Read complete lines from `offset` to EOF; returns the parsed records and

@@ -334,6 +334,9 @@ final class SocialService: ObservableObject {
                 self?.refreshLeaderboard()
             }
         }
+        // Friends/leaderboard are not time-critical; let macOS coalesce this
+        // wakeup with other timers instead of forcing a dedicated radio wake.
+        pollTimer?.tolerance = pollInterval / 4
     }
 
     // MARK: - Helpers

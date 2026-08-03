@@ -4,12 +4,15 @@ import Foundation
 /// report for the current monthly billing cycle. No I/O, no side effects —
 /// shared by `AppModel` (UI) and `DebugDump` (CLI verification).
 enum EarningsCalculator {
+    /// - Parameter recordsAreSorted: `true` when `records` is already ascending
+    ///   by timestamp, letting the session-window scan skip re-sorting it.
     static func report(
         records: [UsageRecord],
         subscriptionPrice: (Tool) -> Double,
         billingAnchorDay: Int,
         now: Date,
-        calendar: Calendar
+        calendar: Calendar,
+        recordsAreSorted: Bool = false
     ) -> EarningsReport {
         let cycleStart = BillingWindow.currentCycleStart(
             anchorDay: billingAnchorDay, now: now, calendar: calendar)
@@ -67,7 +70,9 @@ enum EarningsCalculator {
             .sorted { $0.day < $1.day }
 
         // Active 5h session window (blended across tools).
-        if let block = SessionWindow.activeBlock(records: records, now: now, calendar: calendar) {
+        if let block = SessionWindow.activeBlock(
+            records: records, now: now, calendar: calendar, presorted: recordsAreSorted
+        ) {
             report.session = UsageWindow.from(
                 block.records,
                 start: block.start,

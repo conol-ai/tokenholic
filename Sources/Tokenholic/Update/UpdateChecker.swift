@@ -25,6 +25,8 @@ final class UpdateChecker: ObservableObject {
         timer = Timer.scheduledTimer(withTimeInterval: 24 * 3600, repeats: true) { [weak self] _ in
             Task { @MainActor in self?.checkNow() }
         }
+        // A daily update check has no deadline worth a dedicated wakeup.
+        timer?.tolerance = 3600
     }
 
     func checkNow() { Task { await check() } }

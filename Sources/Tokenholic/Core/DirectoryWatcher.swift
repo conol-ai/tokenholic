@@ -5,7 +5,9 @@ import CoreServices
 /// (already coalesced by `latency`) on a background dispatch queue.
 final class DirectoryWatcher {
     private var stream: FSEventStreamRef?
-    private let queue = DispatchQueue(label: "ai.conol.Tokenholic.fsevents")
+    // .utility so FSEvent delivery and the rescan it kicks off stay on
+    // efficiency cores rather than waking a performance core.
+    private let queue = DispatchQueue(label: "ai.conol.Tokenholic.fsevents", qos: .utility)
     private let onChange: () -> Void
 
     init?(paths: [String], latency: TimeInterval = 3.0, onChange: @escaping () -> Void) {
@@ -16,9 +18,16 @@ final class DirectoryWatcher {
             info: Unmanaged.passUnretained(self).toOpaque(),
             retain: nil, release: nil, copyDescription: nil
         )
-        let flags = FSEventStreamCreateFlags(
-            kFSEventStreamCreateFlagFileEvents | kFSEventStreamCreateFlagNoDefer
-        )
+        // Deliberately *not* kFSEventStreamCreateFlagFileEvents: the callback
+        // ignores the reported paths and just triggers a rescan, so per-file
+        // granularity only multiplies the event volume (Claude Code appends to
+        // a transcript on every message and tool call) for no benefit.
+        //
+        // Deliberately *not* kFSEventStreamCreateFlagNoDefer either. NoDefer
+        // delivers on the leading edge — a burst of writes fires a callback
+        // immediately *and* another at the end of the window. Trailing-edge
+        // delivery collapses that same burst into one callback per `latency`.
+        let flags = FSEventStreamCreateFlags(kFSEventStreamCreateFlagNone)
         guard let stream = FSEventStreamCreate(
             kCFAllocatorDefault,
             Self.eventCallback,

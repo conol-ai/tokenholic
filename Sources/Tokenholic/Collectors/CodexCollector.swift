@@ -35,7 +35,7 @@ struct CodexCollector: UsageCollector {
 enum CodexParser {
     /// Hidden Codex support models run as separate sessions but are not part of
     /// the user's coding workload and have no public API-equivalent price.
-    private static let internalModels: Set<String> = ["codex-auto-review"]
+    static let internalModels: Set<String> = ["codex-auto-review"]
 
     static func parseFile(at url: URL) -> [UsageRecord] {
         guard let data = try? Data(contentsOf: url) else { return [] }
@@ -45,8 +45,10 @@ enum CodexParser {
         var model: String?
         var snapshots: [(timestamp: Date, usage: CodexUsage)] = []
 
+        // One decoder for the whole file rather than one per line.
+        let decoder = JSONDecoder()
         for lineData in data.split(separator: 0x0A, omittingEmptySubsequences: true) {
-            guard let line = try? JSONDecoder().decode(CodexLine.self, from: Data(lineData)) else { continue }
+            guard let line = try? decoder.decode(CodexLine.self, from: Data(lineData)) else { continue }
             switch line.type {
             case "session_meta":
                 if provider == nil { provider = line.payload?.model_provider }
@@ -107,20 +109,20 @@ enum CodexParser {
 
 // MARK: - Raw JSON shapes
 
-private struct CodexLine: Decodable {
+struct CodexLine: Decodable {
     let type: String?
     let timestamp: String?
     let payload: CodexPayload?
 }
 
-private struct CodexPayload: Decodable {
+struct CodexPayload: Decodable {
     let type: String?            // "token_count" (within event_msg)
     let model: String?           // turn_context
     let model_provider: String?  // session_meta
     let info: CodexInfo?         // token_count
 }
 
-private struct CodexInfo: Decodable {
+struct CodexInfo: Decodable {
     let total_token_usage: CodexUsage?
 }
 

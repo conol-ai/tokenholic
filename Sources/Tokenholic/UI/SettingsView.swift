@@ -3,7 +3,12 @@ import SwiftUI
 /// Standalone settings window (opened from the menubar popover's gear button).
 struct SettingsView: View {
     @EnvironmentObject private var model: AppModel
-    @State private var launchAtLogin = LoginItem.isEnabled
+    // Deliberately NOT `= LoginItem.isEnabled`. A @State default is an autoclosure
+    // evaluated every time the view struct is constructed, and `TokenholicApp.body`
+    // reconstructs `SettingsView()` on every AppModel objectWillChange — so that
+    // form made a blocking `SMAppService` XPC round-trip to `smd` on the main
+    // thread on every refresh, even with the window closed. Resolve it on appear.
+    @State private var launchAtLogin = false
 
     private var appVersion: String {
         Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "—"
@@ -30,7 +35,11 @@ struct SettingsView: View {
 
             Section("General") {
                 Toggle("Launch at login", isOn: $launchAtLogin)
+                    .onAppear { launchAtLogin = LoginItem.isEnabled }
                     .onChange(of: launchAtLogin) { _, newValue in
+                        // Ignore the programmatic sync from onAppear; only act
+                        // when the toggle actually diverges from the system state.
+                        guard newValue != LoginItem.isEnabled else { return }
                         do {
                             try LoginItem.setEnabled(newValue)
                         } catch {

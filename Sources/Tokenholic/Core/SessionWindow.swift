@@ -9,9 +9,15 @@ enum SessionWindow {
 
     /// The currently-active block, or nil if the latest block's 5h window has
     /// already elapsed (no active session right now).
-    static func activeBlock(records: [UsageRecord], now: Date, calendar: Calendar) -> (start: Date, records: [UsageRecord])? {
+    /// - Parameter presorted: pass `true` when `records` is already ascending by
+    ///   timestamp, to skip an O(n log n) sort of the entire history. `recompute()`
+    ///   runs on every refresh tick *and* every settings keystroke, so re-sorting
+    ///   the whole corpus here was pure repeated work.
+    static func activeBlock(
+        records: [UsageRecord], now: Date, calendar: Calendar, presorted: Bool = false
+    ) -> (start: Date, records: [UsageRecord])? {
         guard !records.isEmpty else { return nil }
-        let sorted = records.sorted { $0.timestamp < $1.timestamp }
+        let sorted = presorted ? records : records.sorted { $0.timestamp < $1.timestamp }
 
         var blockStart = floorToHour(sorted[0].timestamp, calendar)
         var blockRecords: [UsageRecord] = []

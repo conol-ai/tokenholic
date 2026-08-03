@@ -144,6 +144,9 @@ final class SupabaseSync: ObservableObject {
         pollTimer = Timer.scheduledTimer(withTimeInterval: pollInterval, repeats: true) { [weak self] _ in
             Task { @MainActor in self?.refreshPeers() }
         }
+        // Peer totals are not time-critical; let macOS coalesce this wakeup with
+        // other timers instead of forcing a dedicated one (and a radio wake).
+        pollTimer?.tolerance = pollInterval / 4
     }
 
     func refreshPeers() {

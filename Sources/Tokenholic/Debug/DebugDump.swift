@@ -110,7 +110,7 @@ enum DebugDump {
         let store = ClaudeUsageStore()
         Task {
             _ = await store.scan()
-            box.records = await store.scan()
+            box.records = await store.scan().records
             semaphore.signal()
         }
         semaphore.wait()

@@ -6,8 +6,10 @@ enum ClaudeParser {
     /// Parse a blob of one-or-more transcript lines.
     static func parse(data: Data, sourcePath: String, sessionId: String) -> [UsageRecord] {
         var out: [UsageRecord] = []
+        // One decoder for the whole blob rather than one per line.
+        let decoder = JSONDecoder()
         for line in data.split(separator: 0x0A, omittingEmptySubsequences: true) {
-            if let record = parseLine(Data(line), sourcePath: sourcePath, sessionId: sessionId) {
+            if let record = parseLine(Data(line), decoder: decoder, sourcePath: sourcePath, sessionId: sessionId) {
                 out.append(record)
             }
         }
@@ -22,9 +24,11 @@ enum ClaudeParser {
                      sessionId: url.deletingPathExtension().lastPathComponent)
     }
 
-    private static func parseLine(_ lineData: Data, sourcePath: String, sessionId: String) -> UsageRecord? {
+    private static func parseLine(
+        _ lineData: Data, decoder: JSONDecoder, sourcePath: String, sessionId: String
+    ) -> UsageRecord? {
         guard !lineData.isEmpty,
-              let raw = try? JSONDecoder().decode(RawLine.self, from: lineData),
+              let raw = try? decoder.decode(RawLine.self, from: lineData),
               raw.type == "assistant",
               let message = raw.message,
               let usage = message.usage,

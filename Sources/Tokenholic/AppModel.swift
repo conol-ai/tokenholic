@@ -82,6 +82,8 @@ final class AppModel: ObservableObject {
     // Internal state -------------------------------------------------------
     private var records: [UsageRecord] = []
     private let store = ClaudeUsageStore()
+    private let codexStore = CodexUsageStore()
+    private let geminiStore = GeminiUsageStore()
     private let env = SupabaseEnvironment()
     private lazy var sync = SupabaseSync(env: env)
     private lazy var social = SocialService(env: env)
@@ -93,6 +95,12 @@ final class AppModel: ObservableObject {
     private var priceTable: [String: ModelPrice] = [:]
     private var priceTableLoadedAt: Date?
     private var isRefreshing = false
+    /// Set when a refresh is requested while one is already running, so the
+    /// in-flight pass loops once more instead of the event being dropped.
+    private var refreshRequested = false
+    /// Whether `records` has been priced at least once, so the very first
+    /// refresh always builds the record set even if the stores report no change.
+    private var pricedOnce = false
     private var cloudStarted = false
     private let recomputeInterval: TimeInterval = 60
 
@@ -155,6 +163,11 @@ final class AppModel: ObservableObject {
         timer = Timer.scheduledTimer(withTimeInterval: recomputeInterval, repeats: true) { [weak self] _ in
             Task { @MainActor in self?.refreshNow() }
         }
+        // This tick only needs to be roughly on time. A generous tolerance lets
+        // macOS coalesce it with other timers instead of forcing a dedicated
+        // wakeup every 60s, which is a real battery win for an always-on
+        // menu-bar app.
+        timer?.tolerance = recomputeInterval / 4
         // Cross-device sync + social are quarantined behind cloud mode (off by
         // default): no network activity or subscriptions until the user opts in.
         if cloudModeEnabled { startCloud() }
@@ -247,45 +260,71 @@ final class AppModel: ObservableObject {
     func setLeaderboardDay(_ key: String) { social.setLeaderboardDay(key) }
 
     func refreshNow() {
-        Task { await refresh() }
+        // Background maintenance, not user-initiated work: run the whole scan +
+        // recompute at .utility so it schedules on efficiency cores instead of
+        // spinning up a performance core on every tick.
+        Task(priority: .utility) { await refresh() }
     }
 
     func refresh() async {
-        if isRefreshing { return }
+        // A refresh already in flight will pick up anything that landed while
+        // it ran (see `refreshRequested`), so coalesce rather than drop.
+        if isRefreshing {
+            refreshRequested = true
+            return
+        }
         isRefreshing = true
         defer { isRefreshing = false }
         if status != .loaded { status = .loading }
 
-        await ensurePriceTable()
-        let claudeRaw = await store.scan()                      // actor: incremental, off-main
-        let codexRaw = await Task.detached(priority: .utility) {
-            (try? CodexCollector().collect()) ?? []
-        }.value
-        let geminiRaw = await Task.detached(priority: .utility) {
-            (try? GeminiCliCollector().collect()) ?? []
-        }.value
+        repeat {
+            refreshRequested = false
+            let repriced = await ensurePriceTable()
+            // All three stores are incremental actors: unchanged files are
+            // skipped and grown files are read from the last byte offset. This
+            // is the whole ballgame for idle CPU — a full re-parse of the Codex
+            // session logs alone is ~2s of CPU on a large history, and refresh()
+            // runs every 60s plus on every FSEvent.
+            let claude = await store.scan()                     // actor: incremental, off-main
+            let codex = await codexStore.scan()
+            let gemini = await geminiStore.scan()
 
-        let engine = PricingEngine(table: priceTable)
-        records = Normalizer.dedup(claudeRaw + codexRaw + geminiRaw).map { record in
-            var r = record
-            r.apiEquivalentCostUSD = engine.cost(for: r)
-            return r
-        }
-        lastUpdated = Date()
-        status = .loaded
-        recompute()
+            // Re-dedup and re-price only when something was actually ingested.
+            // On an idle tick nothing on disk moved, so the record set is
+            // already correct and we skip a full pass over the whole history —
+            // but we still recompute(), because the time-based windows
+            // (last-5h, billing-cycle rollover) move even when the data doesn't.
+            if claude.changed || codex.changed || gemini.changed || repriced || !pricedOnce {
+                let engine = PricingEngine(table: priceTable)
+                records = Normalizer.dedup(claude.records + codex.records + gemini.records)
+                    .map { record in
+                        var r = record
+                        r.apiEquivalentCostUSD = engine.cost(for: r)
+                        return r
+                    }
+                // Sort once here, not once per recompute(). dedup() returns
+                // dictionary order, so the array arrives shuffled — and
+                // recompute() runs on every settings keystroke too.
+                records.sort { $0.timestamp < $1.timestamp }
+                pricedOnce = true
+            }
+            lastUpdated = Date()
+            status = .loaded
+            recompute()
+        } while refreshRequested
     }
 
     /// Load the price table once, then refresh at most daily (kept in memory so
     /// we don't re-parse 1.5MB of JSON on every file-change rescan).
-    private func ensurePriceTable() async {
+    /// Returns whether the table was replaced, so callers know to re-price.
+    private func ensurePriceTable() async -> Bool {
         let stale = priceTableLoadedAt.map { Date().timeIntervalSince($0) > 24 * 3600 } ?? true
-        guard priceTable.isEmpty || stale else { return }
+        guard priceTable.isEmpty || stale else { return false }
         let table = await Task.detached(priority: .utility) { PricingProvider.loadTable() }.value
-        if !table.isEmpty {
-            priceTable = table
-            priceTableLoadedAt = Date()
-        }
+        guard !table.isEmpty else { return false }
+        priceTable = table
+        priceTableLoadedAt = Date()
+        return true
     }
 
     // MARK: - Earnings math
@@ -305,7 +344,8 @@ final class AppModel: ObservableObject {
             subscriptionPrice: { [self] in subscriptionPrice(for: $0) },
             billingAnchorDay: billingAnchorDay,
             now: Date(),
-            calendar: .current
+            calendar: .current,
+            recordsAreSorted: true          // `records` is kept sorted by refresh()
         )
         toolSummaries = report.summaries
         blendedMonthlyAPICostUSD = report.blendedMonthlyAPICostUSD
@@ -351,16 +391,23 @@ final class AppModel: ObservableObject {
     /// This device's recent per-day gross API value rows for the social
     /// leaderboard. Only the last two local days are sent: the backend rejects
     /// days outside a tight window, and only today/yesterday can still change.
+    /// Built once — constructing a `DateFormatter` (and its ICU state) on every
+    /// refresh was pure overhead on a path that runs every tick.
+    private static let dayKeyFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.calendar = .current
+        f.timeZone = .current
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.dateFormat = "yyyy-MM-dd"
+        return f
+    }()
+
     private func makeDailyValueWrites() -> [DailyValueWrite] {
         let cal = Calendar.current
         let today = cal.startOfDay(for: Date())
         guard let cutoff = cal.date(byAdding: .day, value: -1, to: today) else { return [] }
         let dev = DeviceIdentity.id
-        let f = DateFormatter()
-        f.calendar = cal
-        f.timeZone = .current
-        f.locale = Locale(identifier: "en_US_POSIX")
-        f.dateFormat = "yyyy-MM-dd"
+        let f = Self.dayKeyFormatter
         return dailyAPICost
             .filter { $0.day >= cutoff }
             .map { DailyValueWrite(device_id: dev, day: f.string(from: $0.day),
